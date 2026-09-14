@@ -1,540 +1,483 @@
 <title>Lolid Level</title>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 
-<!-- Иконка для значка на экране телефона и для закладки.
-     iOS берёт ТОЛЬКО png - svg и data-ссылки здесь не работают, поэтому
-     рядом лежит настоящий файл icon.png 180x180. Скруглённые углы рисует
-     сама система, в картинке их быть не должно. -->
+<!-- iOS берёт ТОЛЬКО png: svg и data-ссылки для apple-touch-icon не работают. -->
 <link rel="apple-touch-icon" href="icon.png">
 <link rel="icon" href="icon.png">
 <meta name="apple-mobile-web-app-title" content="Lolid">
 
 <style>
-  /* Страница носит лицо самого прибора: тот же жёлтый, те же чёрные цифры.
-     Тёмной темы здесь нет намеренно - у инструмента один вид. */
-  :root {
-    --bg:    #ffd400;   /* фирменный жёлтый, как COL_BG в прошивке */
-    --card:  #f0b400;
-    --ink:   #181818;
-    --muted: #6b5a20;
-    --good:  #00734f;
-    --warn:  #b35a10;
-    --bad:   #992222;
-    --bt:    #0082fc;   /* фирменный синий Bluetooth, как COL_BT в прошивке */
-  }
-  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-  body {
-    margin: 0; min-height: 100svh;
-    background: var(--bg); color: var(--ink);
-    font: 16px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
-    display: flex; flex-direction: column;
-    padding: max(14px, env(safe-area-inset-top)) 18px max(14px, env(safe-area-inset-bottom));
-    gap: 12px;
-  }
+/* ПЛАКАТ. Фирменный жёлтый взят всерьёз: чёрная типографика в упор, толстые
+   линейки, НИ ОДНОГО скругления, всё по левому краю. Не «приложение с
+   кнопочками», а печатный лист, который живёт и меняется. */
+:root{
+  --bg:#ffd400; --ink:#0d0d0d; --muted:#7a6510;
+  --good:#0a6b3d; --warn:#8a5a0a; --bad:#8f1d1d; --bt:#0082fc;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{margin:0;min-height:100svh;background:var(--bg);color:var(--ink);
+  font:15px/1.4 "Helvetica Neue",Arial,system-ui,sans-serif;
+  display:flex;flex-direction:column;
+  padding:max(14px,env(safe-area-inset-top)) 18px max(14px,env(safe-area-inset-bottom))}
 
-  header { display: flex; align-items: center; gap: 8px; }
-  .brand { font-size: 12px; font-weight: 800; letter-spacing: .18em; color: var(--muted); }
-  .spacer { flex: 1; }
-  .state { font-size: 12px; color: var(--muted); }
-  .btmark { width: 13px; height: 22px; opacity: .3; }
-  .btmark.on { opacity: 1; }
+header{display:flex;align-items:center;gap:9px;padding-bottom:9px}
+.brand{font-size:13px;font-weight:800;letter-spacing:.24em}
+.sp{flex:1}
+.btmark{width:10px;height:18px;opacity:.22}
+.btmark.on{opacity:1}
+.state{font-size:11px;font-weight:700;letter-spacing:.14em}
+.rule{height:4px;background:var(--ink)}
 
-  main { flex: 1; display: flex; flex-direction: column; justify-content: center; gap: 8px; }
+.eyebrow{font-size:10px;font-weight:800;letter-spacing:.2em;margin:15px 0 3px}
+.huge{font-size:clamp(66px,26vw,112px);font-weight:800;letter-spacing:-.055em;
+  line-height:.84;font-variant-numeric:tabular-nums;margin:0}
+.huge sup{font-size:.33em;font-weight:800;vertical-align:super;letter-spacing:0}
 
-  .angle {
-    font-size: clamp(54px, 21vw, 92px); font-weight: 800; text-align: center;
-    font-variant-numeric: tabular-nums; letter-spacing: -.02em; line-height: 1;
-  }
-  .refline { text-align: center; font-size: 12px; font-weight: 700;
-             letter-spacing: .12em; color: var(--muted); }
+.devrow{display:flex;align-items:flex-end;justify-content:space-between;margin:13px 0 9px}
+.devn{font-size:34px;font-weight:800;letter-spacing:-.03em;font-variant-numeric:tabular-nums}
+.devs{font-size:12px;font-weight:800;letter-spacing:.14em;padding-bottom:6px}
 
-  /* ампула */
-  .vial { position: relative; height: 62px; border-radius: 31px;
-          background: var(--card); border: 1px solid #0002; overflow: hidden; }
-  .gloss{ position: absolute; left: 31px; right: 31px; top: 6px; height: 3px;
-          border-radius: 2px; background: #fff8; }
-  .div  { position: absolute; top: 26px; width: 2px; height: 10px;
-          margin-left: -1px; background: #0003; }
-  .div.mid { top: 20px; height: 22px; background: #0005; }
-  .tick { position: absolute; top: 12px; bottom: 12px; width: 2px;
-          margin-left: -1px; background: var(--good); opacity: .7; }
-  .bub  { position: absolute; top: 7px; width: 48px; height: 48px; border-radius: 50%;
-          left: 50%; margin-left: -24px; transition: transform .08s linear;
-          display: grid; place-items: center; background: #0002; }
-  .bub::after { content: ""; width: 22px; height: 22px; border-radius: 50%; background: var(--card); }
-  .ends { position: absolute; inset: 0; display: flex; align-items: center;
-          justify-content: space-between; padding: 0 14px;
-          font-size: 11px; color: var(--muted); pointer-events: none; }
+/* Шкала: линейка с делениями, столбик от центра и жирная засечка на конце.
+   Засечка здесь главнее столбика: без неё у самого нуля не видно ничего,
+   а это ровно то место, ради которого прибор и нужен. */
+.stage{position:relative;height:64px}
+.axis{position:absolute;left:0;right:0;top:50px;height:2px;background:rgba(0,0,0,.3)}
+.tk{position:absolute;margin-left:-1px;background:rgba(0,0,0,.4)}
+.tk.b{background:rgba(0,0,0,.75)}
+.near{position:absolute;top:10px;height:32px;background:rgba(10,107,61,.15);
+  border-left:1px solid rgba(10,107,61,.5);border-right:1px solid rgba(10,107,61,.5)}
+.zero{position:absolute;top:6px;height:40px;left:50%;width:4px;margin-left:-2px;background:var(--good)}
+.bar{position:absolute;top:17px;height:18px;background:var(--ink)}
+.tip{position:absolute;top:2px;height:48px;width:5px;margin-left:-2.5px;background:var(--ink)}
+.caps{display:flex;justify-content:space-between;font-size:9px;font-weight:800;
+  letter-spacing:.1em;color:var(--muted);margin-top:3px}
 
-  .dev    { text-align: center; font-size: 30px; font-weight: 700; font-variant-numeric: tabular-nums; }
-  .verdict{ text-align: center; font-size: 16px; font-weight: 700; letter-spacing: .06em; }
+.facts{margin-top:auto}
+.fr{display:flex;justify-content:space-between;padding:10px 0;
+  border-top:1px solid rgba(0,0,0,.28);font-size:14px}
+.k{font-weight:800;letter-spacing:.14em;font-size:10px;padding-top:3px}
+.v{font-weight:800;font-variant-numeric:tabular-nums}
 
-  .cells { display: flex; gap: 6px; }
-  .cell  { flex: 1; text-align: center; padding: 6px 4px; }
-  .cell .k { font-size: 10px; letter-spacing: .1em; color: var(--muted); }
-  .cell .v { font-size: 17px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.acts{display:flex;gap:8px;margin-top:13px}
+button{flex:1;font:inherit;font-size:11px;font-weight:800;letter-spacing:.16em;
+  padding:16px 6px;border:3px solid var(--ink);background:transparent;color:var(--ink);
+  display:inline-flex;align-items:center;justify-content:center;gap:8px;cursor:pointer}
+button.pri{background:var(--ink);color:var(--bg)}
+button:disabled{opacity:.3}
+.note{font-size:12px;color:var(--muted);text-align:center;min-height:1.3em;
+  margin-top:9px;white-space:pre-wrap}
+.err{color:var(--bad);font-weight:700}
+.hide{display:none!important}
 
-  .row { display: flex; gap: 10px; }
-  button {
-    flex: 1; font: inherit; font-weight: 700; padding: 15px 10px; border-radius: 13px;
-    border: 2px solid var(--ink); background: var(--ink); color: var(--bg); cursor: pointer;
-    display: inline-flex; align-items: center; justify-content: center; gap: 9px;
-  }
-  button.ghost { background: transparent; color: var(--ink); }
-  button:disabled { opacity: .3; }
-  button svg { flex: none; }
+/* ---------------- калибровка ---------------- */
+.cal{position:fixed;inset:0;background:var(--bg);z-index:10;display:flex;flex-direction:column;
+  padding:max(14px,env(safe-area-inset-top)) 18px max(14px,env(safe-area-inset-bottom))}
+.cstep{font-size:10px;font-weight:800;letter-spacing:.22em;margin:15px 0 6px}
+.ch{font-size:clamp(30px,9vw,38px);font-weight:800;letter-spacing:-.045em;line-height:.94;margin:0}
+.cp{font-size:13px;line-height:1.45;margin:9px 0 0;max-width:26ch}
+.cfig{border:3px solid var(--ink);margin-top:12px}
+.cbar{height:14px;border:3px solid var(--ink);margin-top:12px}
+.cbar i{display:block;height:100%;background:var(--ink);width:0}
+.dots{display:flex;gap:4px;margin-top:10px}
+.dots span{flex:1;height:22px;border:3px solid var(--ink);font-size:9px;font-weight:800;
+  display:flex;align-items:center;justify-content:center}
+.dots span.on{background:var(--ink);color:var(--bg)}
+.row{border-top:3px solid var(--ink);padding:13px 0 14px;cursor:pointer}
+.row:last-of-type{border-bottom:3px solid var(--ink)}
+.rt{display:flex;align-items:baseline;gap:10px}
+.rn{font-size:27px;font-weight:800;letter-spacing:-.04em;min-width:36px}
+.rl{font-size:16px;font-weight:800}
+.rd{font-size:12px;line-height:1.4;margin:4px 0 0 46px;max-width:26ch}
+.cfoot{margin-top:auto;display:flex;gap:8px;padding-top:12px}
 
-  .note { font-size: 13px; color: var(--muted); text-align: center; min-height: 1.3em;
-          white-space: pre-wrap; }
-  .err  { color: var(--bad); font-weight: 600; }
-  pre   { background: #0000000d; padding: 12px; border-radius: 10px; font-size: 12px;
-          overflow-x: auto; margin: 0; }
-  .hide { display: none !important; }
-
-  /* ---------------- экран калибровки ---------------- */
-  .cal { position: fixed; inset: 0; background: var(--bg); z-index: 10;
-         display: flex; flex-direction: column;
-         padding: max(16px, env(safe-area-inset-top)) 18px max(16px, env(safe-area-inset-bottom));
-         gap: 14px; }
-  .cal h2 { margin: 0; font-size: 25px; line-height: 1.15; text-wrap: balance; }
-  .calstep { font-size: 11px; font-weight: 800; letter-spacing: .16em; color: var(--muted); }
-  .calbody { flex: 1; display: flex; flex-direction: column; justify-content: center; gap: 16px; }
-  .calhint { font-size: 15px; color: var(--ink); }
-  .stage { background: var(--card); border-radius: 16px; padding: 14px;
-           display: grid; place-items: center; min-height: 132px; }
-  .bar { height: 8px; border-radius: 4px; background: #0002; overflow: hidden; }
-  .bar i { display: block; height: 100%; background: var(--ink); width: 0;
-           transition: width .12s linear; }
-  .pick { display: flex; flex-direction: column; gap: 10px; }
-  .pick button { justify-content: flex-start; text-align: left; padding: 14px 16px; }
-  .pick .t { font-weight: 800; }
-  .pick .d { font-weight: 400; font-size: 13px; opacity: .75; display: block; margin-top: 3px; }
-  .pickwrap { display: flex; flex-direction: column; gap: 4px; }
+/* ---------------- заставка ---------------- */
+#sp{position:fixed;inset:0;z-index:20;overflow:hidden}
+#sp .lay{position:absolute;inset:0}
+#sp .num{position:absolute;left:0;right:0;top:40%;text-align:center;font-size:62px;
+  font-weight:800;letter-spacing:-.05em;font-variant-numeric:tabular-nums}
+#sp .wd{position:absolute;left:0;right:0;top:40%;text-align:center;font-size:clamp(40px,13vw,54px);
+  font-weight:800;opacity:0}
+#sp .ln{position:absolute;top:calc(40% + 86px);left:50%;height:4px;width:0;transform:translateX(-50%)}
 </style>
 
 <header>
-  <span class="brand">LOLID LEVEL</span>
-  <span class="spacer"></span>
-  <!-- Знак Bluetooth: та же руническая вязь, что нарисована на экране
-       прибора. Пропорции здесь канонические - на экране телефона хватает
-       разрешения, чтобы штрихи не слипались, в отличие от платы. -->
-  <svg class="btmark" id="btmark" viewBox="0 0 12 24" fill="none"
-       stroke="var(--bt)" stroke-width="2.1"
-       stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-    <path d="M0 6 L12 18 L6 24 L6 0 L12 6 L0 18"/>
-  </svg>
-  <span class="state" id="state">not connected</span>
+  <span class="brand">LOLID</span><span class="sp"></span>
+  <!-- Руническая вязь Bluetooth: та же, что нарисована на экране прибора. -->
+  <svg class="btmark" id="btmark" viewBox="0 0 12 24" fill="none" stroke="var(--bt)"
+       stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+    <path d="M0 6 L12 18 L6 24 L6 0 L12 6 L0 18"/></svg>
+  <span class="state" id="state">OFFLINE</span>
 </header>
+<div class="rule"></div>
 
-<main>
-  <div class="angle" id="angle">—</div>
-  <div class="refline" id="refline">&nbsp;</div>
+<div class="eyebrow" id="eyebrow">ABSOLUTE ANGLE</div>
+<div class="huge"><span id="ang">—</span><sup id="deg"></sup></div>
 
-  <div class="vial" id="vial">
-    <div class="gloss"></div>
-    <div class="tick" id="tickL"></div>
-    <div class="tick" id="tickR"></div>
-    <div class="bub" id="bub"></div>
-    <div class="ends"><span id="endL">-10</span><span id="endR">+10</span></div>
-  </div>
+<div class="devrow"><span class="devn" id="dev">&nbsp;</span><span class="devs" id="verd">&nbsp;</span></div>
 
-  <div class="dev" id="dev">&nbsp;</div>
-  <div class="verdict" id="verdict">&nbsp;</div>
+<div class="stage" id="stage"></div>
+<div class="caps"><span id="capL">−10°</span><span id="capM">&nbsp;</span><span id="capR">+10°</span></div>
 
-  <div class="cells">
-    <div class="cell"><div class="k">CROSS</div><div class="v" id="cross">—</div></div>
-    <div class="cell"><div class="k">|a|</div><div class="v" id="mag">—</div></div>
-    <div class="cell"><div class="k">MODE</div><div class="v" id="mode">—</div></div>
-  </div>
-</main>
-
-<div class="row">
-  <button id="btnConnect">
-    <svg width="11" height="20" viewBox="0 0 12 24" fill="none" stroke="currentColor"
-         stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
-      <path d="M0 6 L12 18 L6 24 L6 0 L12 6 L0 18"/>
-    </svg>
-    <span id="btnConnectLabel">Connect</span>
-  </button>
-</div>
-<div class="row hide" id="rowLive">
-  <button id="btnZero" class="ghost">Set zero</button>
-  <button id="btnCal" class="ghost">Calibrate</button>
+<div class="facts">
+  <div class="fr"><span class="k">CROSS</span><span class="v" id="cross">—</span></div>
+  <div class="fr"><span class="k">VECTOR |a|</span><span class="v" id="mag">—</span></div>
 </div>
 
+<div class="acts" id="actsOff">
+  <button class="pri" id="btnConnect">
+    <svg width="10" height="18" viewBox="0 0 12 24" fill="none" stroke="currentColor"
+         stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M0 6 L12 18 L6 24 L6 0 L12 6 L0 18"/></svg>
+    CONNECT</button>
+</div>
+<div class="acts hide" id="actsOn">
+  <button id="btnZero">SET ZERO</button>
+  <button class="pri" id="btnCal">CALIBRATE</button>
+</div>
 <div class="note" id="note"></div>
-<pre id="info" class="hide"></pre>
 
-<!-- ------------------------- экран калибровки ------------------------- -->
-<div class="cal hide" id="cal">
-  <div class="calstep" id="calStep">CALIBRATION</div>
-  <div class="calbody">
-    <h2 id="calTitle">Choose a method</h2>
-    <div class="calhint" id="calHint"></div>
-    <div class="stage hide" id="calStage"></div>
-    <div class="bar hide" id="calBar"><i id="calBarFill"></i></div>
+<div class="cal hide" id="cal"></div>
 
-    <div class="pickwrap" id="calPick">
-      <div class="pick">
-        <button class="ghost" data-cmd="c2">
-          <span><span class="t">2 POINT — set zero</span>
-          <span class="d">Lay it down, flip it 180° on the same spot. Cancels out the surface itself.</span></span>
-        </button>
-        <button class="ghost" data-cmd="c3">
-          <span><span class="t">3 POINT — zero and gain</span>
-          <span class="d">Same, plus one reading against a true 90° square.</span></span>
-        </button>
-        <button class="ghost" data-cmd="ca">
-          <span><span class="t">AXES — no reference needed</span>
-          <span class="d">Show it six different faces. Fixes the sensor itself, not the number.</span></span>
-        </button>
-      </div>
-    </div>
+<div id="sp">
+  <div class="lay" style="background:#0d0d0d">
+    <div class="num" id="n1" style="color:#ffd400">0.00°</div>
+    <div class="ln" id="l1" style="background:#ffd400"></div>
   </div>
-
-  <div class="row">
-    <button id="calNext" class="hide">Measure</button>
-  </div>
-  <div class="row">
-    <button id="calClose" class="ghost">Close</button>
+  <div class="lay" id="top" style="background:#ffd400;clip-path:inset(0 0 100% 0)">
+    <div class="num" id="n2" style="color:#0d0d0d">0.00°</div>
+    <div class="wd" id="wd" style="color:#0d0d0d;letter-spacing:.78em">LOLID</div>
+    <div class="ln" id="l2" style="background:#0d0d0d"></div>
   </div>
 </div>
 
 <script>
 // ============================================================================
-//  Связь с прибором через Web Bluetooth.
+//  Lolid Level — страница для телефона.
 //
-//  В Safari этого нет и не будет - Apple Web Bluetooth не поддерживает.
-//  Страницу надо открывать в браузере Bluefy из App Store: он именно для
-//  этого и сделан. На Android достаточно обычного Chrome.
-//
-//  Ещё одно требование, которое ловит всех: страница должна открываться по
-//  HTTPS. По http:// или из файла Web Bluetooth молчит.
+//  Web Bluetooth. В Safari его нет и не будет: на iPhone открывать в Bluefy,
+//  на Android годится Chrome. Страница обязана отдаваться по HTTPS — по http
+//  или из файла Bluetooth молчит.
 // ============================================================================
 
-// Номера обязаны совпадать с ble.cpp в прошивке. Первые четыре байта - "loli".
-// Web Bluetooth принимает их ТОЛЬКО строчными буквами.
-const SVC  = '6c6f6c69-6400-1000-8000-00805f9b34fb';
-const MEAS = '6c6f6c69-6401-1000-8000-00805f9b34fb';
-const CMD  = '6c6f6c69-6402-1000-8000-00805f9b34fb';
-const INFO = '6c6f6c69-6403-1000-8000-00805f9b34fb';
+var SVC ='6c6f6c69-6400-1000-8000-00805f9b34fb';
+var MEAS='6c6f6c69-6401-1000-8000-00805f9b34fb';
+var CMD ='6c6f6c69-6402-1000-8000-00805f9b34fb';
+var INFO='6c6f6c69-6403-1000-8000-00805f9b34fb';
 
-// Должны совпадать с config.h прибора, иначе страница начнёт врать о шкале.
-const BUBBLE_RANGE = 10.0;   // BUBBLE_RANGE
-const LEVEL_TOL    = 0.10;   // LEVEL_TOL
+// Должны совпадать с config.h прибора, иначе шкала начнёт врать о себе.
+var RANGE=10.0;   // BUBBLE_RANGE
+var TOL=0.10;     // LEVEL_TOL
+var NEAR=3.0;     // ширина «подходишь» — только показ, на приговор не влияет
 
-// Состояния прибора - порядок как в enum ButtonMode (calib.h). Телефон не
-// хранит своего представления о том, что происходит: он показывает то,
-// что прибор о себе сообщил. Иначе экран и прибор разойдутся при первой же
-// потерянной посылке.
-const M = {
-  NORMAL:0, MENU:1, WAIT1:2, MEAS1:3, WAIT2:4, MEAS2:5,
-  WAIT90:6, MEAS90:7, DONE:8, AUTO:9, AUTODONE:10
-};
+// Режимы прибора: порядок как в enum ButtonMode (calib.h). Своего
+// представления о происходящем телефон НЕ держит — он показывает то, что
+// прибор о себе сообщил, иначе экраны разойдутся на первой потере посылки.
+var M={NORMAL:0,MENU:1,W1:2,M1:3,W2:4,M2:5,W90:6,M90:7,DONE:8,AUTO:9,AUTODONE:10};
 
-const $ = id => document.getElementById(id);
-let device = null, chCmd = null, chInfo = null;
-let last = null;                 // последний пакет
-let calOpen = false;             // открыт ли экран калибровки
+var $=function(id){return document.getElementById(id);};
+var dec=new TextDecoder(), enc=new TextEncoder();
+var device=null, chCmd=null, last=null, prevMode=0;
+var calOpen=false, calTotal=null, figRaf=null;
 
-const dec = new TextDecoder();
-const enc = new TextEncoder();
-
-function setState(text, live) {
-  $('state').textContent = text;
-  $('btmark').classList.toggle('on', !!live);
-  $('rowLive').classList.toggle('hide', !live);
-  $('btnConnectLabel').textContent = live ? 'Disconnect' : 'Connect';
-}
-
-function note(msg, isErr) {
-  $('note').textContent = msg || '';
-  $('note').className = 'note' + (isErr ? ' err' : '');
-}
-
-// --------------------------------------------------------------------------
-//  Подключение. requestDevice() обязан вызываться из настоящего нажатия -
-//  браузер не даст странице открыть выбор устройств самостоятельно.
-// --------------------------------------------------------------------------
-async function connect() {
-  if (!navigator.bluetooth) {
-    note('This browser has no Bluetooth.\nOn iPhone open this page in Bluefy, on Android in Chrome.', true);
-    return;
+/* ------------------------------ шкала ------------------------------ */
+(function buildStage(){
+  var s=$('stage'), h='';
+  h+='<div class="axis"></div>';
+  for(var i=-10;i<=10;i++){
+    var b=(i%5===0);
+    h+='<div class="tk'+(b?' b':'')+'" style="top:'+(b?42:46)+'px;left:'+(50+i*4.6)+'%;width:'+(b?3:1)+'px;height:'+(b?8:4)+'px"></div>';
   }
-  try {
-    note('');
-    setState('scanning…', false);
-
-    // Фильтр по номеру службы - не украшение: без него в списке окажутся
-    // все наушники и часы в радиусе десяти метров.
-    device = await navigator.bluetooth.requestDevice({ filters: [{ services: [SVC] }] });
-    device.addEventListener('gattserverdisconnected', onDisconnected);
-
-    setState('connecting…', false);
-    const server = await device.gatt.connect();
-    const svc = await server.getPrimaryService(SVC);
-
-    chCmd  = await svc.getCharacteristic(CMD);
-    chInfo = await svc.getCharacteristic(INFO);
-
-    const meas = await svc.getCharacteristic(MEAS);
-    meas.addEventListener('characteristicvaluechanged', onMeas);
-    // Вот это и есть подписка. Без неё прибор не шлёт НИЧЕГО и молча ждёт -
-    // так устроен BLE, это экономит батарею.
-    await meas.startNotifications();
-
-    chCmd.addEventListener('characteristicvaluechanged', e => {
-      note(dec.decode(e.target.value).trim());
-    });
-    await chCmd.startNotifications();
-
-    setState('connected', true);
-  } catch (e) {
-    setState('not connected', false);
-    // Отмена выбора устройства - не ошибка, человек просто закрыл список.
-    if (e && e.name === 'NotFoundError') note('');
-    else note('Failed: ' + (e && e.message ? e.message : e), true);
-  }
-}
-
-function onDisconnected() {
-  setState('not connected', false);
-  last = null;
-  closeCal();
-  $('angle').textContent = '—';
-  $('cross').textContent = $('mag').textContent = $('mode').textContent = '—';
-  $('dev').innerHTML = $('verdict').innerHTML = $('refline').innerHTML = '&nbsp;';
-  note('Device disconnected. Tap Connect.');
-}
-
-// --------------------------------------------------------------------------
-//  Разбор пакета: 17 байт, младший байт первым (true в getFloat32).
-//     0  float  главный угол, уже с учётом REL-нуля
-//     4  float  поперечный
-//     8  float  |a|
-//    12  uint8  режим прибора (см. M выше)
-//    13  uint8  флаги: бит0 REL, бит1 стоит на торце
-//    14  uint16 счётчик посылок
-//    16  uint8  ход текущего шага калибровки, 0..255
-// --------------------------------------------------------------------------
-function onMeas(e) {
-  const d = e.target.value;
-  if (d.byteLength < 16) return;
-
-  const p = {
-    a:    d.getFloat32(0, true),
-    b:    d.getFloat32(4, true),
-    mag:  d.getFloat32(8, true),
-    mode: d.getUint8(12),
-    rel:  (d.getUint8(13) & 0x01) !== 0,
-    prog: d.byteLength >= 17 ? d.getUint8(16) / 255 : 0
-  };
-  last = p;
-
-  renderMain(p);
-  if (calOpen) renderCal(p);
-
-  // Прибор могли начать калибровать кнопкой, а не с телефона. Тогда экран
-  // калибровки должен открыться сам: иначе человек смотрит на цифры, которые
-  // в этот момент ничего не значат.
-  if (!calOpen && p.mode !== M.NORMAL && p.mode !== M.MENU) openCal();
-}
-
-function renderMain(p) {
-  // Опора - ближайшая из 0, ±90, ±180. Та же логика, что рисует пузырёк
-  // на самом приборе: если считать по-своему, два экрана разойдутся.
-  const t = Math.abs(p.a);
-  let dev, ref;
-  if (t >= 135)     { dev = p.a > 0 ? p.a - 180 : p.a + 180; ref = 180; }
-  else if (t >= 45) { dev = p.a > 0 ? p.a -  90 : p.a +  90; ref =  90; }
-  else              { dev = p.a;                             ref =   0; }
-
-  const ad = Math.abs(dev);
-  const col = ad < LEVEL_TOL ? 'var(--good)'
-            : ad < BUBBLE_RANGE * 0.35 ? 'var(--warn)' : 'var(--bad)';
-
-  $('angle').textContent = p.a.toFixed(2) + '°';
-  $('refline').textContent = 'FROM ' + ref + '°';
-
-  $('dev').textContent = (dev >= 0 ? '+' : '') + dev.toFixed(2) + '°';
-  $('dev').style.color = col;
-
-  $('verdict').textContent = (ref === 0 ? 'LEVEL' : 'PLUMB') + (ad < LEVEL_TOL ? ' — OK' : ' — OFF');
-  $('verdict').style.color = col;
-
-  $('cross').textContent = p.b.toFixed(2) + '°';
-  $('mode').textContent  = p.rel ? 'REL' : 'ABS';
-
-  // |a| обязана быть 1.000 в ЛЮБОМ положении: сила тяжести от поворота не
-  // меняется. Отклонение - прямая мера того, как плохо откалиброваны оси.
-  $('mag').textContent = p.mag.toFixed(4);
-  $('mag').style.color = Math.abs(p.mag - 1) < 0.004 ? 'var(--good)' : 'var(--warn)';
-
-  const v = $('bub');
-  const cl = Math.max(-BUBBLE_RANGE, Math.min(BUBBLE_RANGE, dev));
-  const travel = (v.parentElement.clientWidth / 2) - 30;
-  v.style.transform = 'translateX(' + (cl / BUBBLE_RANGE * travel).toFixed(1) + 'px)';
-  v.style.background = col;
-}
-
-// --------------------------------------------------------------------------
-//  Экран калибровки.
-//
-//  Ни одного собственного шага телефон не выдумывает: он читает режим из
-//  пакета и рисует то, что этому режиму соответствует. Автомат калибровки
-//  живёт в приборе и только там - телефон ему просто кнопка и подпись.
-// --------------------------------------------------------------------------
-
-// Картинки поз рисуются на месте, а не картинками: так они и в тон странице,
-// и весят ноль. Оранжевый корпус - будущий продукт, как на экране прибора.
-const ART = {
-  flat: `<svg viewBox="0 0 220 100" width="100%" height="104">
-    <rect x="10" y="78" width="200" height="6" rx="3" fill="#0003"/>
-    <g><rect x="36" y="46" width="148" height="32" rx="7" fill="#e07b1a" stroke="#181818" stroke-width="2.5"/>
-    <rect x="92" y="55" width="36" height="14" rx="7" fill="#ffd400" stroke="#181818" stroke-width="2"/>
-    <circle cx="110" cy="62" r="4.5" fill="#181818"/></g></svg>`,
-  flip: `<svg viewBox="0 0 220 100" width="100%" height="104">
-    <rect x="10" y="78" width="200" height="6" rx="3" fill="#0003"/>
-    <path d="M60 34 A 60 30 0 0 1 160 34" fill="none" stroke="#181818" stroke-width="2.5"
-          stroke-dasharray="5 4"/>
-    <path d="M160 34 l-9 -8 l1 13 z" fill="#181818"/>
-    <g><rect x="36" y="46" width="148" height="32" rx="7" fill="#e07b1a" stroke="#181818" stroke-width="2.5"/>
-    <rect x="92" y="55" width="36" height="14" rx="7" fill="#ffd400" stroke="#181818" stroke-width="2"/>
-    <circle cx="110" cy="62" r="4.5" fill="#181818"/></g>
-    <text x="110" y="97" font-size="12" font-weight="700" text-anchor="middle" fill="#181818">SAME SPOT</text></svg>`,
-  up: `<svg viewBox="0 0 220 100" width="100%" height="104">
-    <rect x="10" y="84" width="200" height="6" rx="3" fill="#0003"/>
-    <rect x="28" y="6" width="6" height="78" rx="3" fill="#0003"/>
-    <g><rect x="40" y="6" width="32" height="78" rx="7" fill="#e07b1a" stroke="#181818" stroke-width="2.5"/>
-    <rect x="49" y="36" width="14" height="36" rx="7" fill="#ffd400" stroke="#181818" stroke-width="2"/>
-    <circle cx="56" cy="54" r="4.5" fill="#181818"/></g>
-    <text x="140" y="50" font-size="22" font-weight="800" text-anchor="middle" fill="#181818">90°</text></svg>`,
-  // Три ЗАМЕТНО разные позы: стоймя, плашмя, на ребре. Одинаковые по форме
-  // фигуры здесь читались бы как «положи так же», то есть ровно наоборот.
-  faces: `<svg viewBox="0 0 220 100" width="100%" height="104">
-    <g fill="none" stroke="#181818" stroke-width="2.5">
-      <rect x="24" y="24" width="34" height="50" rx="7"/>
-      <rect x="82" y="32" width="56" height="34" rx="7"/>
-      <rect x="160" y="26" width="46" height="46" rx="7" transform="rotate(45 183 49)"/>
-    </g>
-    <text x="110" y="93" font-size="12" font-weight="700" text-anchor="middle" fill="#181818">SIX DIFFERENT FACES</text></svg>`
-};
-
-const STEPS = {
-  [M.WAIT1]:  { step:'STEP 1',  title:'Place it down',
-                hint:'Put the level on any support — it does not need to be flat. Let go, then tap Measure.',
-                art:'flat', next:'Measure' },
-  [M.MEAS1]:  { step:'STEP 1',  title:'Hold still',
-                hint:'Don’t touch it. The level is waiting for the shaking to die down, then it reads.',
-                art:'flat', bar:true },
-  [M.WAIT2]:  { step:'STEP 2',  title:'Turn it 180°',
-                hint:'Same support, same spot, just the other way round. This is what cancels out the surface itself.',
-                art:'flip', next:'Measure' },
-  [M.MEAS2]:  { step:'STEP 2',  title:'Hold still',
-                hint:'Don’t touch it.',
-                art:'flip', bar:true },
-  [M.WAIT90]: { step:'STEP 3',  title:'Stand it up',
-                hint:'Set it against a true square, standing on its end. Accuracy here is only as good as your square.',
-                art:'up', next:'Measure' },
-  [M.MEAS90]: { step:'STEP 3',  title:'Hold still',
-                hint:'Don’t touch it.',
-                art:'up', bar:true },
-  [M.DONE]:   { step:'DONE',    title:'Level up',
-                hint:'Calibration saved to the device. It survives power off.',
-                art:'flat' },
-  [M.AUTO]:   { step:'AXES',    title:'Turn it over',
-                hint:'Rest it on a different face and hold still — it takes each one by itself. Tap Capture if it hesitates.',
-                art:'faces', next:'Capture', bar:true },
-  [M.AUTODONE]:{step:'DONE',    title:'Axes set',
-                hint:'Now run 2 POINT to set the zero.',
-                art:'faces' }
-};
-
-function openCal()  { calOpen = true;  $('cal').classList.remove('hide'); if (last) renderCal(last); }
-function closeCal() { calOpen = false; $('cal').classList.add('hide'); }
-
-function renderCal(p) {
-  const s = STEPS[p.mode];
-
-  // Прибор в обычном режиме - значит либо ещё не начали, либо всё кончилось.
-  // Показываем выбор способа.
-  if (!s) {
-    $('calPick').classList.remove('hide');
-    $('calStage').classList.add('hide');
-    $('calBar').classList.add('hide');
-    $('calNext').classList.add('hide');
-    $('calStep').textContent = 'CALIBRATION';
-    $('calTitle').textContent = 'Choose a method';
-    $('calHint').textContent = 'The level does the work — the phone just shows you where you are.';
-    $('calClose').textContent = 'Close';
-    return;
-  }
-
-  $('calPick').classList.add('hide');
-  $('calStep').textContent  = s.step;
-  $('calTitle').textContent = s.title;
-  $('calHint').textContent  = s.hint;
-  $('calClose').textContent = (p.mode === M.DONE || p.mode === M.AUTODONE) ? 'Close' : 'Cancel';
-
-  $('calStage').classList.remove('hide');
-  $('calStage').innerHTML = ART[s.art];
-
-  $('calBar').classList.toggle('hide', !s.bar);
-  if (s.bar) $('calBarFill').style.width = (p.prog * 100).toFixed(0) + '%';
-
-  $('calNext').classList.toggle('hide', !s.next);
-  if (s.next) $('calNext').textContent = s.next;
-}
-
-// --------------------------------------------------------------------------
-
-async function send(cmd) {
-  if (!chCmd) return;
-  await chCmd.writeValue(enc.encode(cmd));
-}
-
-$('btnConnect').onclick = () => {
-  if (device && device.gatt.connected) device.gatt.disconnect();
-  else connect();
-};
-
-$('btnZero').onclick = () => send('z');    // тот же язык, что в мониторе порта
-$('btnCal').onclick  = () => openCal();
-$('calClose').onclick = () => {
-  // «Cancel» на середине калибровки обязан вернуть прибор в обычный режим,
-  // а не просто закрыть экран: иначе прибор так и останется ждать шага,
-  // о котором человек уже забыл.
-  if (last && last.mode !== M.NORMAL && last.mode !== M.DONE && last.mode !== M.AUTODONE) send('x');
-  closeCal();
-};
-$('calNext').onclick = () => send('n');
-
-for (const b of document.querySelectorAll('#calPick button'))
-  b.onclick = () => send(b.dataset.cmd);
-
-// Разметка шкалы считается, а не вписана руками: поменяется BUBBLE_RANGE -
-// и деления с подписями съедут сами, а не начнут врать.
-(function drawScale() {
-  const vial = $('vial');
-  for (let i = -2; i <= 2; i++) {
-    const d = document.createElement('div');
-    d.className = 'div' + (i === 0 ? ' mid' : '');
-    d.style.left = (50 + i * 20) + '%';
-    vial.insertBefore(d, $('tickL'));
-  }
-  // Зона допуска: 0.1 градуса от диапазона в 10 - это полпроцента ширины.
-  // Две риски встали бы вплотную и слились в одну черту, поэтому у них есть
-  // нижняя граница разноса.
-  const p = Math.max(3.2, (LEVEL_TOL / BUBBLE_RANGE) * 50);
-  $('tickL').style.left = (50 - p) + '%';
-  $('tickR').style.left = (50 + p) + '%';
-  $('endL').textContent = '-' + BUBBLE_RANGE;
-  $('endR').textContent = '+' + BUBBLE_RANGE;
+  var nw=(NEAR/RANGE)*46;
+  h+='<div class="near" style="left:'+(50-nw)+'%;width:'+(nw*2)+'%"></div>';
+  h+='<div class="zero"></div><div class="bar" id="bar"></div><div class="tip" id="tip"></div>';
+  s.innerHTML=h;
 })();
 
-if (!navigator.bluetooth) {
-  note('This browser has no Bluetooth.\nOn iPhone open this page in Bluefy, on Android in Chrome.', true);
-} else {
-  note('Switch the level on, then tap Connect.');
+function colOf(ad){ return ad<TOL?'var(--good)':(ad<RANGE*0.35?'var(--warn)':'var(--bad)'); }
+
+/* ------------------------------ связь ------------------------------ */
+function setState(txt,live){
+  $('state').textContent=txt;
+  $('btmark').classList.toggle('on',!!live);
+  $('actsOn').classList.toggle('hide',!live);
+  $('actsOff').classList.toggle('hide',!!live);
 }
+function note(m,bad){ $('note').textContent=m||''; $('note').className='note'+(bad?' err':''); }
+
+async function connect(){
+  if(!navigator.bluetooth){ note('This browser has no Bluetooth.\nOn iPhone open this page in Bluefy.',1); return; }
+  try{
+    note(''); setState('SCANNING',false);
+    // Фильтр по номеру службы не украшение: без него в списке окажутся все
+    // наушники и часы в радиусе десяти метров.
+    device=await navigator.bluetooth.requestDevice({filters:[{services:[SVC]}]});
+    device.addEventListener('gattserverdisconnected',onLost);
+    setState('LINKING',false);
+    var srv=await device.gatt.connect(), s=await srv.getPrimaryService(SVC);
+    chCmd=await s.getCharacteristic(CMD);
+    var meas=await s.getCharacteristic(MEAS);
+    meas.addEventListener('characteristicvaluechanged',onMeas);
+    // Подписка. Без неё прибор не шлёт НИЧЕГО и молча ждёт — так устроен BLE.
+    await meas.startNotifications();
+    chCmd.addEventListener('characteristicvaluechanged',function(e){ note(dec.decode(e.target.value).trim()); });
+    await chCmd.startNotifications();
+    setState('LINKED',true);
+  }catch(e){
+    setState('OFFLINE',false);
+    if(e&&e.name==='NotFoundError') note('');          // человек просто закрыл список
+    else note('Failed: '+((e&&e.message)||e),1);
+  }
+}
+function onLost(){
+  setState('OFFLINE',false); last=null; chCmd=null; closeCal();
+  $('ang').textContent='—'; $('deg').textContent='';
+  $('dev').innerHTML=$('verd').innerHTML='&nbsp;';
+  $('cross').textContent=$('mag').textContent='—';
+  note('Device disconnected.');
+}
+function send(c){ if(chCmd) chCmd.writeValue(enc.encode(c)); }
+
+/* --------------------------- пакет замера ---------------------------
+   17 байт, младший байт первым:
+     0 float угол · 4 float поперечный · 8 float |a|
+     12 uint8 режим · 13 uint8 флаги · 14 uint16 счётчик · 16 uint8 ход шага  */
+function onMeas(e){
+  var d=e.target.value;
+  if(d.byteLength<16) return;
+  var p={a:d.getFloat32(0,true),b:d.getFloat32(4,true),mag:d.getFloat32(8,true),
+         mode:d.getUint8(12),rel:(d.getUint8(13)&1)!==0,
+         prog:d.byteLength>=17?d.getUint8(16)/255:0};
+  last=p;
+  drawMain(p);
+  if(calOpen) drawCal(p);
+  // Калибровку могли начать кнопкой на приборе — тогда экран открывается сам.
+  if(!calOpen && p.mode!==M.NORMAL && p.mode!==M.MENU) openCal();
+  // Прибор сам возвращается в обычный режим после «готово» — уходим с ним.
+  if(calOpen && p.mode===M.NORMAL && (prevMode===M.DONE||prevMode===M.AUTODONE)) closeCal();
+  prevMode=p.mode;
+}
+
+function drawMain(p){
+  // Опора — ближайшая из 0, ±90, ±180. Та же логика, что и на приборе:
+  // посчитай телефон по-своему, и два экрана разойдутся.
+  var t=Math.abs(p.a), dev, ref;
+  if(t>=135){ dev=p.a>0?p.a-180:p.a+180; ref=180; }
+  else if(t>=45){ dev=p.a>0?p.a-90:p.a+90; ref=90; }
+  else { dev=p.a; ref=0; }
+  var ad=Math.abs(dev), col=colOf(ad);
+
+  $('eyebrow').textContent=p.rel?'RELATIVE ANGLE':'ABSOLUTE ANGLE';
+  $('ang').textContent=p.a.toFixed(2); $('deg').textContent='°';
+  var D=$('dev'); D.textContent=(dev<0?'−':'+')+ad.toFixed(2)+'°'; D.style.color=col;
+  var V=$('verd'); V.textContent=(ref===0?'LEVEL':'PLUMB')+' · '+(ad<TOL?'OK':'OFF'); V.style.color=col;
+  $('capM').textContent='FROM '+ref+'°';
+  $('cross').textContent=p.b.toFixed(2)+'°';
+  // |a| обязана быть 1.000 в ЛЮБОМ положении: сила тяжести от поворота не
+  // меняется. Отклонение — прямая мера того, как плохо откалиброваны оси.
+  var G=$('mag'); G.textContent=p.mag.toFixed(4);
+  G.style.color=Math.abs(p.mag-1)<0.004?'var(--good)':'var(--warn)';
+
+  var cl=Math.max(-RANGE,Math.min(RANGE,dev)), q=cl/RANGE, w=Math.abs(q)*46;
+  var bar=$('bar'), tip=$('tip');
+  bar.style.left=(q<0?(50-w):50)+'%'; bar.style.width=w+'%'; bar.style.background=col;
+  tip.style.left=(50+q*46)+'%'; tip.style.background=col;
+}
+
+/* --------------------------- калибровка ---------------------------- */
+var TILT=-6.9, L=104, W=30, T=18, FLOOR=118, CX=104;
+
+var FIG={
+  flat:'<svg viewBox="0 0 250 130" style="width:100%;display:block"><rect x="0" y="108" width="250" height="6" fill="#0d0d0d"/><rect x="186" y="88" width="26" height="20" fill="#0d0d0d"/><g id="fg"><rect x="34" y="82" width="178" height="26" fill="#0d0d0d"/><rect x="110" y="89" width="30" height="12" fill="#ffd400"/></g></svg>',
+  flip:'<svg viewBox="0 0 250 130" style="width:100%;display:block"><rect x="0" y="108" width="250" height="6" fill="#0d0d0d"/><rect x="186" y="88" width="26" height="20" fill="#0d0d0d"/><rect x="30" y="116" width="7" height="8" fill="#0d0d0d"/><rect x="205" y="116" width="7" height="8" fill="#0d0d0d"/><g id="fg"><rect x="34" y="82" width="178" height="26" fill="#0d0d0d"/><rect x="110" y="89" width="30" height="12" fill="#ffd400"/><rect x="44" y="89" width="14" height="12" fill="#ffd400"/></g></svg>',
+  up:'<svg viewBox="0 0 250 130" style="width:100%;display:block"><rect x="2" y="112" width="238" height="12" fill="#0d0d0d"/><rect x="2" y="6" width="12" height="118" fill="#0d0d0d"/><g id="ang2" opacity="0"><path d="M72 112 L46 112 L46 86" fill="none" stroke="#0d0d0d" stroke-width="5"/><text x="92" y="108" font-family="Helvetica Neue,Arial" font-size="34" font-weight="800" fill="#0d0d0d">90</text></g><g id="fg"><rect x="40" y="86" width="96" height="26" fill="#0d0d0d"/><rect x="74" y="92" width="28" height="14" fill="#ffd400"/></g></svg>',
+  faces:'<svg viewBox="0 0 250 130" style="width:100%;display:block"><rect x="0" y="'+FLOOR+'" width="250" height="6" fill="#0d0d0d"/><text id="axl" x="206" y="58" text-anchor="middle" font-family="Helvetica Neue,Arial" font-size="42" font-weight="800" fill="#0d0d0d">Z+</text><text x="206" y="78" text-anchor="middle" font-family="Helvetica Neue,Arial" font-size="9" font-weight="800" letter-spacing="2" fill="#0d0d0d">DOWN</text><g id="fg"></g></svg>'
+};
+
+// Шесть положений ОДНОГО бруска L x W x T. Длина не меняется никогда —
+// меняется лишь то, какое ребро смотрит вверх и какая грань к нам.
+var POS=[
+  {w:L,h:T,l:'Z+',face:0,edge:'top'},   {w:L,h:T,l:'Z−',face:0,edge:'bot'},
+  {w:L,h:W,l:'X+',face:1,edge:'top'},   {w:L,h:W,l:'X−',face:1,edge:'bot'},
+  {w:T,h:L,l:'Y+',face:0,edge:'left'},  {w:T,h:L,l:'Y−',face:0,edge:'right'}
+];
+var LBL=['Z+','Z−','X+','X−','Y+','Y−'];
+
+function ease(x){ return x<0?0:x>1?1:x*x*(3-2*x); }
+function eo(x){ return x<0?0:x>1?1:1-Math.pow(1-x,3); }
+
+function ruler(s){
+  var x=CX-s.w/2, y=FLOOR-s.h, o='', i;
+  o+='<rect x="'+x+'" y="'+y+'" width="'+s.w+'" height="'+s.h+'" fill="#0d0d0d"/>';
+  if(s.edge==='left'||s.edge==='right'){
+    for(i=1;i<10;i++){ var yy=y+i*(s.h/10), ln=(i%2?5:9);
+      o+='<rect x="'+(s.edge==='left'?x+3:x+s.w-3-ln)+'" y="'+yy.toFixed(1)+'" width="'+ln+'" height="2.5" fill="#ffd400"/>'; }
+  } else {
+    for(i=1;i<10;i++){ var xx=x+i*(s.w/10), ln2=(i%2?5:9);
+      o+='<rect x="'+xx.toFixed(1)+'" y="'+(s.edge==='top'?y+3:y+s.h-3-ln2)+'" width="2.5" height="'+ln2+'" fill="#ffd400"/>'; }
+  }
+  // Окошко ампулы живёт на широкой грани: видно его только когда эта грань
+  // повёрнута к нам, иначе прибор смотрел бы сквозь себя.
+  if(s.face) o+='<rect x="'+(x+s.w/2-15)+'" y="'+(y+s.h/2-6)+'" width="30" height="12" fill="#ffd400"/>';
+  o+='<rect id="hl" x="'+x+'" y="'+y+'" width="'+s.w+'" height="'+s.h+'" fill="none" stroke="#0d0d0d" stroke-width="3" opacity="0"/>';
+  return {svg:o,x:x,w:s.w};
+}
+
+function animate(kind){
+  if(figRaf) cancelAnimationFrame(figRaf);
+  var root=$('cal'), g=root.querySelector('#fg'); if(!g) return;
+  var ang2=root.querySelector('#ang2'), axl=root.querySelector('#axl'), t0=performance.now();
+  (function tick(now){
+    var t=(now-t0)/1000;
+    if(kind==='flat'){
+      // Падает УЖЕ наклонённым и садится на два касания: левый край на стол,
+      // правый на кубик. Отскок только ВВЕРХ — вниз мешает стол.
+      var p=t%3.2, dy=0;
+      if(p<0.55){ var k=p/0.55; dy=-92*(1-k*k); }
+      else if(p<1.6){ var q=p-0.55; dy=-5*Math.abs(Math.cos(q*13))*Math.exp(-4.6*q); }
+      g.setAttribute('transform','translate(0 '+dy.toFixed(2)+') rotate('+TILT+' 34 108)');
+    } else if(kind==='flip'){
+      var p2=t%3.8, dy2=0, a=0;
+      if(p2<0.4) dy2=-34*ease(p2/0.4);
+      else if(p2<1.6){ dy2=-34; a=180*ease((p2-0.4)/1.2); }
+      else if(p2<2.0){ dy2=-34*(1-ease((p2-1.6)/0.4)); a=180; }
+      else a=180;
+      g.setAttribute('transform','translate(0 '+dy2.toFixed(1)+') rotate('+TILT+' 34 108) rotate('+a.toFixed(1)+' 123 95)');
+    } else if(kind==='up'){
+      var p3=t%4.2, a3=0, vis=0;
+      if(p3<0.55) a3=0;
+      else if(p3<1.9) a3=-90*eo((p3-0.55)/1.35);
+      else if(p3<3.5){ a3=-90; vis=ease((p3-1.95)/0.35); }
+      else a3=-90*(1-ease((p3-3.5)/0.6));
+      g.setAttribute('transform','rotate('+a3.toFixed(2)+' 40 112)');
+      if(ang2) ang2.setAttribute('opacity',vis.toFixed(2));
+    } else {
+      var STEP=1.45, p4=t%(STEP*6), i=Math.floor(p4/STEP), q4=(p4%STEP)/STEP;
+      var cur=POS[i], prev=POS[(i+5)%6];
+      var shape=(q4<0.45)?prev:cur, rot=(q4<0.45)?90*eo(q4/0.45):0;
+      var pulse=(q4<0.45)?0:Math.sin((q4-0.45)/0.55*Math.PI);
+      var r=ruler(shape);
+      g.innerHTML=r.svg;
+      g.setAttribute('transform','rotate('+rot.toFixed(2)+' '+(r.x+r.w)+' '+FLOOR+')');
+      var hl=g.querySelector('#hl'); if(hl) hl.setAttribute('opacity',(pulse*0.9).toFixed(2));
+      if(axl) axl.textContent=shape.l;
+    }
+    figRaf=requestAnimationFrame(tick);
+  })(t0);
+}
+
+var S={};
+S[M.W1] ={s:'STEP 1',t:'PROP<br>ONE END',p:'Slip a block under one end so it sits at an angle. Crooked is what we want — the support cancels itself out.',f:'flat',b:'MEASURE'};
+S[M.M1] ={s:'STEP 1',t:'HOLD<br>STILL',p:'Don’t touch it. The level waits for the shaking to die down, then reads.',f:'flat',bar:1};
+S[M.W2] ={s:'STEP 2',t:'TURN IT<br>180°',p:'Same block, same spot, the other way round. The marks below do not move.',f:'flip',b:'MEASURE'};
+S[M.M2] ={s:'STEP 2',t:'HOLD<br>STILL',p:'Don’t touch it.',f:'flip',bar:1};
+S[M.W90]={s:'STEP 3',t:'TIP IT<br>UP',p:'Stand it on its end, flush against a true square. Accuracy here is only as good as your square.',f:'up',b:'MEASURE'};
+S[M.M90]={s:'STEP 3',t:'HOLD<br>STILL',p:'Don’t touch it.',f:'up',bar:1};
+S[M.DONE]={s:'DONE',t:'LEVEL<br>UP',p:'Calibration written to the device. It survives power off.',f:'flat'};
+S[M.AUTO]={s:'AXES',t:'EACH SIDE<br>DOWN',p:'Rest it so a different axis points down, and hold still. Six in all: X, Y and Z, both ways.',f:'faces',b:'CAPTURE',dots:1};
+S[M.AUTODONE]={s:'DONE',t:'AXES<br>SET',p:'Now run 2 POINT to set the zero.',f:'faces'};
+
+var HEAD='<div style="display:flex;align-items:center;gap:9px;padding-bottom:9px">'+
+  '<span class="brand">LOLID</span><span class="sp"></span>'+
+  '<svg class="btmark on" viewBox="0 0 12 24" fill="none" stroke="var(--bt)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M0 6 L12 18 L6 24 L6 0 L12 6 L0 18"/></svg>'+
+  '<span class="state">LINKED</span></div><div class="rule"></div>';
+
+function openCal(){ calOpen=true; $('cal').classList.remove('hide'); if(last) drawCal(last); }
+function closeCal(){ calOpen=false; $('cal').classList.add('hide');
+  if(figRaf){ cancelAnimationFrame(figRaf); figRaf=null; } }
+
+function drawCal(p){
+  var d=S[p.mode], html=HEAD;
+
+  if(!d){   // прибор свободен — показываем выбор способа
+    html+='<div class="cstep">CALIBRATION</div><h2 class="ch">CHOOSE<br>A METHOD</h2><div style="margin-top:16px">'+
+      '<div class="row" data-c="c2"><div class="rt"><span class="rn">01</span><span class="rl">2 POINT</span></div><p class="rd">Zero only. A tilted support is fine — that is the whole trick.</p></div>'+
+      '<div class="row" data-c="c3"><div class="rt"><span class="rn">02</span><span class="rl">3 POINT</span></div><p class="rd">Zero and gain. Adds one reading against a true square.</p></div>'+
+      '<div class="row" data-c="ca"><div class="rt"><span class="rn">03</span><span class="rl">AXES</span></div><p class="rd">No reference needed. Each axis, X Y Z, pointing down in turn.</p></div>'+
+      '</div><div class="cfoot"><button id="cClose">CLOSE</button></div>';
+    $('cal').innerHTML=html;
+    var rows=$('cal').querySelectorAll('.row');
+    for(var i=0;i<rows.length;i++)(function(r){
+      r.addEventListener('click',function(){
+        calTotal = r.dataset.c==='c3' ? 3 : (r.dataset.c==='c2' ? 2 : null);
+        send(r.dataset.c);
+      });
+    })(rows[i]);
+    $('cClose').addEventListener('click',closeCal);
+    if(figRaf){ cancelAnimationFrame(figRaf); figRaf=null; }
+    return;
+  }
+
+  var step=d.s;
+  if(/^STEP/.test(step) && calTotal) step+=' / '+calTotal;
+  html+='<div class="cstep">'+step+'</div><h2 class="ch">'+d.t+'</h2><p class="cp">'+d.p+'</p>'+
+        '<div class="cfig">'+FIG[d.f]+'</div>';
+  if(d.dots){
+    var done=Math.round(p.prog*6);
+    html+='<div class="dots">';
+    for(var j=0;j<6;j++) html+='<span'+(j<done?' class="on"':'')+'>'+LBL[j]+'</span>';
+    html+='</div>';
+  }
+  // Ход шага считает ПРИБОР: телефон мог бы отмерять пять секунд сам, но это
+  // была бы его догадка — выдержка начинается, когда команда дошла.
+  if(d.bar) html+='<div class="cbar"><i style="width:'+(p.prog*100).toFixed(1)+'%"></i></div>';
+  html+='<div class="cfoot">';
+  if(d.b) html+='<button class="pri" id="cAct">'+d.b+'</button>';
+  html+='<button id="cCancel">'+((p.mode===M.DONE||p.mode===M.AUTODONE)?'CLOSE':'CANCEL')+'</button></div>';
+
+  // Перерисовываем целиком только когда шаг СМЕНИЛСЯ: иначе анимация
+  // фигуры перезапускалась бы десять раз в секунду и стояла бы на месте.
+  if($('cal').dataset.mode!==String(p.mode)){
+    $('cal').innerHTML=html;
+    $('cal').dataset.mode=String(p.mode);
+    var act=$('cAct'); if(act) act.addEventListener('click',function(){ send('n'); });
+    $('cCancel').addEventListener('click',function(){
+      if(p.mode!==M.DONE&&p.mode!==M.AUTODONE) send('x');
+      closeCal();
+    });
+    animate(d.f);
+  } else {
+    var fill=$('cal').querySelector('.cbar i'); if(fill) fill.style.width=(p.prog*100).toFixed(1)+'%';
+    var dots=$('cal').querySelectorAll('.dots span');
+    if(dots.length){ var dn=Math.round(p.prog*6);
+      for(var q=0;q<dots.length;q++) dots[q].classList.toggle('on',q<dn); }
+  }
+}
+
+/* ------------------------------ кнопки ----------------------------- */
+$('btnConnect').addEventListener('click',connect);
+$('btnZero').addEventListener('click',function(){ send('z'); });
+$('btnCal').addEventListener('click',function(){ $('cal').dataset.mode=''; openCal(); });
+
+/* ----------------------------- заставка ----------------------------
+   Чёрный лист: цифра гаснет к нулю, держит паузу — и лист переворачивается
+   резкой кромкой, после чего слово стягивается из разлёта.
+   Запуск и снятие идут по таймеру, а не только по requestAnimationFrame:
+   rAF не тикает, пока вкладка не на экране, и заставка повисла бы навсегда. */
+(function splash(){
+  var sp=$('sp'), n1=$('n1'), n2=$('n2'), l1=$('l1'), l2=$('l2'), top=$('top'), wd=$('wd');
+  var TOTAL=5.6, t0=performance.now(), raf=null;
+  function end(){ sp.style.transition='opacity .5s'; sp.style.opacity='0';
+    setTimeout(function(){ if(sp.parentNode) sp.parentNode.removeChild(sp); },520); }
+  setTimeout(function(){ if(raf) cancelAnimationFrame(raf); if($('sp')) end(); },(TOTAL+1.4)*1000);
+
+  (function tick(now){
+    var t=(now-t0)/1000;
+    var v=86*Math.exp(-1.35*t)*Math.cos(t*3.3);
+    if(t<2.55){
+      var s=(Math.abs(v)<0.02?0:Math.abs(v)).toFixed(2)+'°';
+      n1.textContent=s; n2.textContent=s;
+    } else { n1.textContent=n2.textContent='0.00°'; }
+    if(t>2.05&&t<2.95){ var dd=Math.min(1,(t-2.05)/.70); l1.style.width=(118*dd).toFixed(0)+'px'; }
+    if(t>=3.05){ var k=Math.min(1,(t-3.05)/.34), e=k*k*(3-2*k);
+      top.style.clipPath='inset(0 0 '+(100-100*e).toFixed(1)+'% 0)'; l2.style.width='118px'; }
+    if(t>3.55){ var m=Math.min(1,(t-3.55)/1.15), q=1-Math.pow(1-m,4);
+      n2.style.opacity=Math.max(0,1-m*2.2).toFixed(2);
+      wd.style.opacity=q.toFixed(2);
+      wd.style.letterSpacing=(0.78-0.60*q).toFixed(3)+'em';
+      l2.style.width=(118+56*q).toFixed(0)+'px'; }
+    if(t<TOTAL) raf=requestAnimationFrame(tick); else end();
+  })(t0);
+})();
+
+if(!navigator.bluetooth) note('This browser has no Bluetooth.\nOn iPhone open this page in Bluefy.',1);
+else note('Switch the level on, then tap connect.');
 </script>
