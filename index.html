@@ -8,6 +8,7 @@
 <link rel="apple-touch-icon" href="icon.png">
 <link rel="icon" href="icon.png">
 <meta name="apple-mobile-web-app-title" content="Lolid">
+
 <style>
   /* Страница носит лицо самого прибора: тот же жёлтый, те же чёрные цифры.
      Тёмной темы здесь нет намеренно - у инструмента один вид. */
@@ -19,6 +20,7 @@
     --good:  #00734f;
     --warn:  #b35a10;
     --bad:   #992222;
+    --bt:    #0082fc;   /* фирменный синий Bluetooth, как COL_BT в прошивке */
   }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   body {
@@ -26,21 +28,21 @@
     background: var(--bg); color: var(--ink);
     font: 16px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
     display: flex; flex-direction: column;
-    padding: max(16px, env(safe-area-inset-top)) 18px max(16px, env(safe-area-inset-bottom));
-    gap: 14px;
+    padding: max(14px, env(safe-area-inset-top)) 18px max(14px, env(safe-area-inset-bottom));
+    gap: 12px;
   }
 
-  header { display: flex; align-items: center; gap: 10px; }
+  header { display: flex; align-items: center; gap: 8px; }
   .brand { font-size: 12px; font-weight: 800; letter-spacing: .18em; color: var(--muted); }
   .spacer { flex: 1; }
-  .dot { width: 10px; height: 10px; border-radius: 50%; background: #0003; }
-  .dot.on { background: var(--good); }
   .state { font-size: 12px; color: var(--muted); }
+  .btmark { width: 13px; height: 22px; opacity: .3; }
+  .btmark.on { opacity: 1; }
 
-  main { flex: 1; display: flex; flex-direction: column; justify-content: center; gap: 10px; }
+  main { flex: 1; display: flex; flex-direction: column; justify-content: center; gap: 8px; }
 
   .angle {
-    font-size: clamp(56px, 22vw, 96px); font-weight: 800; text-align: center;
+    font-size: clamp(54px, 21vw, 92px); font-weight: 800; text-align: center;
     font-variant-numeric: tabular-nums; letter-spacing: -.02em; line-height: 1;
   }
   .refline { text-align: center; font-size: 12px; font-weight: 700;
@@ -51,13 +53,9 @@
           background: var(--card); border: 1px solid #0002; overflow: hidden; }
   .gloss{ position: absolute; left: 31px; right: 31px; top: 6px; height: 3px;
           border-radius: 2px; background: #fff8; }
-  /* деления шкалы - как на приборе */
   .div  { position: absolute; top: 26px; width: 2px; height: 10px;
           margin-left: -1px; background: #0003; }
   .div.mid { top: 20px; height: 22px; background: #0005; }
-  /* Зона допуска. Ширина считается из LEVEL_TOL, но с нижней границей:
-     0.1 от 10 градусов - это полпроцента шкалы, две риски слились бы
-     в одну черту и перестали что-либо показывать. */
   .tick { position: absolute; top: 12px; bottom: 12px; width: 2px;
           margin-left: -1px; background: var(--good); opacity: .7; }
   .bub  { position: absolute; top: 7px; width: 48px; height: 48px; border-radius: 50%;
@@ -69,10 +67,10 @@
           font-size: 11px; color: var(--muted); pointer-events: none; }
 
   .dev    { text-align: center; font-size: 30px; font-weight: 700; font-variant-numeric: tabular-nums; }
-  .verdict{ text-align: center; font-size: 17px; font-weight: 700; letter-spacing: .06em; }
+  .verdict{ text-align: center; font-size: 16px; font-weight: 700; letter-spacing: .06em; }
 
   .cells { display: flex; gap: 6px; }
-  .cell  { flex: 1; text-align: center; padding: 8px 4px; }
+  .cell  { flex: 1; text-align: center; padding: 6px 4px; }
   .cell .k { font-size: 10px; letter-spacing: .1em; color: var(--muted); }
   .cell .v { font-size: 17px; font-weight: 700; font-variant-numeric: tabular-nums; }
 
@@ -80,23 +78,52 @@
   button {
     flex: 1; font: inherit; font-weight: 700; padding: 15px 10px; border-radius: 13px;
     border: 2px solid var(--ink); background: var(--ink); color: var(--bg); cursor: pointer;
+    display: inline-flex; align-items: center; justify-content: center; gap: 9px;
   }
   button.ghost { background: transparent; color: var(--ink); }
-  button:disabled { opacity: .35; }
+  button:disabled { opacity: .3; }
+  button svg { flex: none; }
 
-  .note { font-size: 13px; color: var(--muted); text-align: center; min-height: 1.4em;
+  .note { font-size: 13px; color: var(--muted); text-align: center; min-height: 1.3em;
           white-space: pre-wrap; }
   .err  { color: var(--bad); font-weight: 600; }
   pre   { background: #0000000d; padding: 12px; border-radius: 10px; font-size: 12px;
           overflow-x: auto; margin: 0; }
   .hide { display: none !important; }
+
+  /* ---------------- экран калибровки ---------------- */
+  .cal { position: fixed; inset: 0; background: var(--bg); z-index: 10;
+         display: flex; flex-direction: column;
+         padding: max(16px, env(safe-area-inset-top)) 18px max(16px, env(safe-area-inset-bottom));
+         gap: 14px; }
+  .cal h2 { margin: 0; font-size: 25px; line-height: 1.15; text-wrap: balance; }
+  .calstep { font-size: 11px; font-weight: 800; letter-spacing: .16em; color: var(--muted); }
+  .calbody { flex: 1; display: flex; flex-direction: column; justify-content: center; gap: 16px; }
+  .calhint { font-size: 15px; color: var(--ink); }
+  .stage { background: var(--card); border-radius: 16px; padding: 14px;
+           display: grid; place-items: center; min-height: 132px; }
+  .bar { height: 8px; border-radius: 4px; background: #0002; overflow: hidden; }
+  .bar i { display: block; height: 100%; background: var(--ink); width: 0;
+           transition: width .12s linear; }
+  .pick { display: flex; flex-direction: column; gap: 10px; }
+  .pick button { justify-content: flex-start; text-align: left; padding: 14px 16px; }
+  .pick .t { font-weight: 800; }
+  .pick .d { font-weight: 400; font-size: 13px; opacity: .75; display: block; margin-top: 3px; }
+  .pickwrap { display: flex; flex-direction: column; gap: 4px; }
 </style>
 
 <header>
   <span class="brand">LOLID LEVEL</span>
   <span class="spacer"></span>
-  <span class="dot" id="dot"></span>
-  <span class="state" id="state">не подключено</span>
+  <!-- Знак Bluetooth: та же руническая вязь, что нарисована на экране
+       прибора. Пропорции здесь канонические - на экране телефона хватает
+       разрешения, чтобы штрихи не слипались, в отличие от платы. -->
+  <svg class="btmark" id="btmark" viewBox="0 0 12 24" fill="none"
+       stroke="var(--bt)" stroke-width="2.1"
+       stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+    <path d="M0 6 L12 18 L6 24 L6 0 L12 6 L0 18"/>
+  </svg>
+  <span class="state" id="state">not connected</span>
 </header>
 
 <main>
@@ -117,20 +144,61 @@
   <div class="cells">
     <div class="cell"><div class="k">CROSS</div><div class="v" id="cross">—</div></div>
     <div class="cell"><div class="k">|a|</div><div class="v" id="mag">—</div></div>
-    <div class="cell"><div class="k">РЕЖИМ</div><div class="v" id="mode">—</div></div>
+    <div class="cell"><div class="k">MODE</div><div class="v" id="mode">—</div></div>
   </div>
 </main>
 
 <div class="row">
-  <button id="btnConnect">Подключить уровень</button>
+  <button id="btnConnect">
+    <svg width="11" height="20" viewBox="0 0 12 24" fill="none" stroke="currentColor"
+         stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M0 6 L12 18 L6 24 L6 0 L12 6 L0 18"/>
+    </svg>
+    <span id="btnConnectLabel">Connect</span>
+  </button>
 </div>
 <div class="row hide" id="rowLive">
-  <button id="btnZero" class="ghost">Взять ноль</button>
-  <button id="btnInfo" class="ghost">О приборе</button>
+  <button id="btnZero" class="ghost">Set zero</button>
+  <button id="btnCal" class="ghost">Calibrate</button>
 </div>
 
 <div class="note" id="note"></div>
 <pre id="info" class="hide"></pre>
+
+<!-- ------------------------- экран калибровки ------------------------- -->
+<div class="cal hide" id="cal">
+  <div class="calstep" id="calStep">CALIBRATION</div>
+  <div class="calbody">
+    <h2 id="calTitle">Choose a method</h2>
+    <div class="calhint" id="calHint"></div>
+    <div class="stage hide" id="calStage"></div>
+    <div class="bar hide" id="calBar"><i id="calBarFill"></i></div>
+
+    <div class="pickwrap" id="calPick">
+      <div class="pick">
+        <button class="ghost" data-cmd="c2">
+          <span><span class="t">2 POINT — set zero</span>
+          <span class="d">Lay it down, flip it 180° on the same spot. Cancels out the surface itself.</span></span>
+        </button>
+        <button class="ghost" data-cmd="c3">
+          <span><span class="t">3 POINT — zero and gain</span>
+          <span class="d">Same, plus one reading against a true 90° square.</span></span>
+        </button>
+        <button class="ghost" data-cmd="ca">
+          <span><span class="t">AXES — no reference needed</span>
+          <span class="d">Show it six different faces. Fixes the sensor itself, not the number.</span></span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div class="row">
+    <button id="calNext" class="hide">Measure</button>
+  </div>
+  <div class="row">
+    <button id="calClose" class="ghost">Close</button>
+  </div>
+</div>
 
 <script>
 // ============================================================================
@@ -141,8 +209,7 @@
 //  этого и сделан. На Android достаточно обычного Chrome.
 //
 //  Ещё одно требование, которое ловит всех: страница должна открываться по
-//  HTTPS. По http:// или из файла Web Bluetooth молчит - это не каприз
-//  браузера, а условие безопасности.
+//  HTTPS. По http:// или из файла Web Bluetooth молчит.
 // ============================================================================
 
 // Номера обязаны совпадать с ble.cpp в прошивке. Первые четыре байта - "loli".
@@ -156,17 +223,28 @@ const INFO = '6c6f6c69-6403-1000-8000-00805f9b34fb';
 const BUBBLE_RANGE = 10.0;   // BUBBLE_RANGE
 const LEVEL_TOL    = 0.10;   // LEVEL_TOL
 
+// Состояния прибора - порядок как в enum ButtonMode (calib.h). Телефон не
+// хранит своего представления о том, что происходит: он показывает то,
+// что прибор о себе сообщил. Иначе экран и прибор разойдутся при первой же
+// потерянной посылке.
+const M = {
+  NORMAL:0, MENU:1, WAIT1:2, MEAS1:3, WAIT2:4, MEAS2:5,
+  WAIT90:6, MEAS90:7, DONE:8, AUTO:9, AUTODONE:10
+};
+
 const $ = id => document.getElementById(id);
 let device = null, chCmd = null, chInfo = null;
+let last = null;                 // последний пакет
+let calOpen = false;             // открыт ли экран калибровки
 
 const dec = new TextDecoder();
 const enc = new TextEncoder();
 
 function setState(text, live) {
   $('state').textContent = text;
-  $('dot').classList.toggle('on', !!live);
+  $('btmark').classList.toggle('on', !!live);
   $('rowLive').classList.toggle('hide', !live);
-  $('btnConnect').textContent = live ? 'Отключить' : 'Подключить уровень';
+  $('btnConnectLabel').textContent = live ? 'Disconnect' : 'Connect';
 }
 
 function note(msg, isErr) {
@@ -180,19 +258,19 @@ function note(msg, isErr) {
 // --------------------------------------------------------------------------
 async function connect() {
   if (!navigator.bluetooth) {
-    note('Этот браузер не умеет Bluetooth.\nНа iPhone откройте страницу в Bluefy, на Android — в Chrome.', true);
+    note('This browser has no Bluetooth.\nOn iPhone open this page in Bluefy, on Android in Chrome.', true);
     return;
   }
   try {
     note('');
-    setState('ищу прибор…', false);
+    setState('scanning…', false);
 
     // Фильтр по номеру службы - не украшение: без него в списке окажутся
     // все наушники и часы в радиусе десяти метров.
     device = await navigator.bluetooth.requestDevice({ filters: [{ services: [SVC] }] });
     device.addEventListener('gattserverdisconnected', onDisconnected);
 
-    setState('подключаюсь…', false);
+    setState('connecting…', false);
     const server = await device.gatt.connect();
     const svc = await server.getPrimaryService(SVC);
 
@@ -210,76 +288,202 @@ async function connect() {
     });
     await chCmd.startNotifications();
 
-    setState('на связи', true);
+    setState('connected', true);
   } catch (e) {
-    setState('не подключено', false);
+    setState('not connected', false);
     // Отмена выбора устройства - не ошибка, человек просто закрыл список.
     if (e && e.name === 'NotFoundError') note('');
-    else note('Не вышло: ' + (e && e.message ? e.message : e), true);
+    else note('Failed: ' + (e && e.message ? e.message : e), true);
   }
 }
 
 function onDisconnected() {
-  setState('не подключено', false);
+  setState('not connected', false);
+  last = null;
+  closeCal();
   $('angle').textContent = '—';
   $('cross').textContent = $('mag').textContent = $('mode').textContent = '—';
   $('dev').innerHTML = $('verdict').innerHTML = $('refline').innerHTML = '&nbsp;';
-  note('Прибор отключился. Нажмите «Подключить уровень».');
+  note('Device disconnected. Tap Connect.');
 }
 
 // --------------------------------------------------------------------------
-//  Разбор пакета: 16 байт, младший байт первым (true в getFloat32).
+//  Разбор пакета: 17 байт, младший байт первым (true в getFloat32).
 //     0  float  главный угол, уже с учётом REL-нуля
 //     4  float  поперечный
 //     8  float  |a|
-//    12  uint8  режим прибора
+//    12  uint8  режим прибора (см. M выше)
 //    13  uint8  флаги: бит0 REL, бит1 стоит на торце
 //    14  uint16 счётчик посылок
+//    16  uint8  ход текущего шага калибровки, 0..255
 // --------------------------------------------------------------------------
 function onMeas(e) {
   const d = e.target.value;
   if (d.byteLength < 16) return;
 
-  const a    = d.getFloat32(0, true);
-  const b    = d.getFloat32(4, true);
-  const mag  = d.getFloat32(8, true);
-  const flags= d.getUint8(13);
-  const rel  = (flags & 0x01) !== 0;
+  const p = {
+    a:    d.getFloat32(0, true),
+    b:    d.getFloat32(4, true),
+    mag:  d.getFloat32(8, true),
+    mode: d.getUint8(12),
+    rel:  (d.getUint8(13) & 0x01) !== 0,
+    prog: d.byteLength >= 17 ? d.getUint8(16) / 255 : 0
+  };
+  last = p;
 
+  renderMain(p);
+  if (calOpen) renderCal(p);
+
+  // Прибор могли начать калибровать кнопкой, а не с телефона. Тогда экран
+  // калибровки должен открыться сам: иначе человек смотрит на цифры, которые
+  // в этот момент ничего не значат.
+  if (!calOpen && p.mode !== M.NORMAL && p.mode !== M.MENU) openCal();
+}
+
+function renderMain(p) {
   // Опора - ближайшая из 0, ±90, ±180. Та же логика, что рисует пузырёк
   // на самом приборе: если считать по-своему, два экрана разойдутся.
-  const t = Math.abs(a);
+  const t = Math.abs(p.a);
   let dev, ref;
-  if (t >= 135)     { dev = a > 0 ? a - 180 : a + 180; ref = 180; }
-  else if (t >= 45) { dev = a > 0 ? a -  90 : a +  90; ref =  90; }
-  else              { dev = a;                          ref =   0; }
+  if (t >= 135)     { dev = p.a > 0 ? p.a - 180 : p.a + 180; ref = 180; }
+  else if (t >= 45) { dev = p.a > 0 ? p.a -  90 : p.a +  90; ref =  90; }
+  else              { dev = p.a;                             ref =   0; }
 
   const ad = Math.abs(dev);
   const col = ad < LEVEL_TOL ? 'var(--good)'
             : ad < BUBBLE_RANGE * 0.35 ? 'var(--warn)' : 'var(--bad)';
 
-  $('angle').textContent = a.toFixed(2) + '°';
-  $('refline').textContent = 'ОТ ' + ref + '°';
+  $('angle').textContent = p.a.toFixed(2) + '°';
+  $('refline').textContent = 'FROM ' + ref + '°';
 
   $('dev').textContent = (dev >= 0 ? '+' : '') + dev.toFixed(2) + '°';
   $('dev').style.color = col;
 
-  $('verdict').textContent = (ref === 0 ? 'ГОРИЗОНТ' : 'ОТВЕС') + (ad < LEVEL_TOL ? ' — РОВНО' : ' — НЕТ');
+  $('verdict').textContent = (ref === 0 ? 'LEVEL' : 'PLUMB') + (ad < LEVEL_TOL ? ' — OK' : ' — OFF');
   $('verdict').style.color = col;
 
-  $('cross').textContent = b.toFixed(2) + '°';
-  $('mode').textContent  = rel ? 'REL' : 'ABS';
+  $('cross').textContent = p.b.toFixed(2) + '°';
+  $('mode').textContent  = p.rel ? 'REL' : 'ABS';
 
   // |a| обязана быть 1.000 в ЛЮБОМ положении: сила тяжести от поворота не
   // меняется. Отклонение - прямая мера того, как плохо откалиброваны оси.
-  $('mag').textContent = mag.toFixed(4);
-  $('mag').style.color = Math.abs(mag - 1) < 0.004 ? 'var(--good)' : 'var(--warn)';
+  $('mag').textContent = p.mag.toFixed(4);
+  $('mag').style.color = Math.abs(p.mag - 1) < 0.004 ? 'var(--good)' : 'var(--warn)';
 
   const v = $('bub');
   const cl = Math.max(-BUBBLE_RANGE, Math.min(BUBBLE_RANGE, dev));
   const travel = (v.parentElement.clientWidth / 2) - 30;
   v.style.transform = 'translateX(' + (cl / BUBBLE_RANGE * travel).toFixed(1) + 'px)';
   v.style.background = col;
+}
+
+// --------------------------------------------------------------------------
+//  Экран калибровки.
+//
+//  Ни одного собственного шага телефон не выдумывает: он читает режим из
+//  пакета и рисует то, что этому режиму соответствует. Автомат калибровки
+//  живёт в приборе и только там - телефон ему просто кнопка и подпись.
+// --------------------------------------------------------------------------
+
+// Картинки поз рисуются на месте, а не картинками: так они и в тон странице,
+// и весят ноль. Оранжевый корпус - будущий продукт, как на экране прибора.
+const ART = {
+  flat: `<svg viewBox="0 0 220 100" width="100%" height="104">
+    <rect x="10" y="78" width="200" height="6" rx="3" fill="#0003"/>
+    <g><rect x="36" y="46" width="148" height="32" rx="7" fill="#e07b1a" stroke="#181818" stroke-width="2.5"/>
+    <rect x="92" y="55" width="36" height="14" rx="7" fill="#ffd400" stroke="#181818" stroke-width="2"/>
+    <circle cx="110" cy="62" r="4.5" fill="#181818"/></g></svg>`,
+  flip: `<svg viewBox="0 0 220 100" width="100%" height="104">
+    <rect x="10" y="78" width="200" height="6" rx="3" fill="#0003"/>
+    <path d="M60 34 A 60 30 0 0 1 160 34" fill="none" stroke="#181818" stroke-width="2.5"
+          stroke-dasharray="5 4"/>
+    <path d="M160 34 l-9 -8 l1 13 z" fill="#181818"/>
+    <g><rect x="36" y="46" width="148" height="32" rx="7" fill="#e07b1a" stroke="#181818" stroke-width="2.5"/>
+    <rect x="92" y="55" width="36" height="14" rx="7" fill="#ffd400" stroke="#181818" stroke-width="2"/>
+    <circle cx="110" cy="62" r="4.5" fill="#181818"/></g>
+    <text x="110" y="97" font-size="12" font-weight="700" text-anchor="middle" fill="#181818">SAME SPOT</text></svg>`,
+  up: `<svg viewBox="0 0 220 100" width="100%" height="104">
+    <rect x="10" y="84" width="200" height="6" rx="3" fill="#0003"/>
+    <rect x="28" y="6" width="6" height="78" rx="3" fill="#0003"/>
+    <g><rect x="40" y="6" width="32" height="78" rx="7" fill="#e07b1a" stroke="#181818" stroke-width="2.5"/>
+    <rect x="49" y="36" width="14" height="36" rx="7" fill="#ffd400" stroke="#181818" stroke-width="2"/>
+    <circle cx="56" cy="54" r="4.5" fill="#181818"/></g>
+    <text x="140" y="50" font-size="22" font-weight="800" text-anchor="middle" fill="#181818">90°</text></svg>`,
+  // Три ЗАМЕТНО разные позы: стоймя, плашмя, на ребре. Одинаковые по форме
+  // фигуры здесь читались бы как «положи так же», то есть ровно наоборот.
+  faces: `<svg viewBox="0 0 220 100" width="100%" height="104">
+    <g fill="none" stroke="#181818" stroke-width="2.5">
+      <rect x="24" y="24" width="34" height="50" rx="7"/>
+      <rect x="82" y="32" width="56" height="34" rx="7"/>
+      <rect x="160" y="26" width="46" height="46" rx="7" transform="rotate(45 183 49)"/>
+    </g>
+    <text x="110" y="93" font-size="12" font-weight="700" text-anchor="middle" fill="#181818">SIX DIFFERENT FACES</text></svg>`
+};
+
+const STEPS = {
+  [M.WAIT1]:  { step:'STEP 1',  title:'Place it down',
+                hint:'Put the level on any support — it does not need to be flat. Let go, then tap Measure.',
+                art:'flat', next:'Measure' },
+  [M.MEAS1]:  { step:'STEP 1',  title:'Hold still',
+                hint:'Don’t touch it. The level is waiting for the shaking to die down, then it reads.',
+                art:'flat', bar:true },
+  [M.WAIT2]:  { step:'STEP 2',  title:'Turn it 180°',
+                hint:'Same support, same spot, just the other way round. This is what cancels out the surface itself.',
+                art:'flip', next:'Measure' },
+  [M.MEAS2]:  { step:'STEP 2',  title:'Hold still',
+                hint:'Don’t touch it.',
+                art:'flip', bar:true },
+  [M.WAIT90]: { step:'STEP 3',  title:'Stand it up',
+                hint:'Set it against a true square, standing on its end. Accuracy here is only as good as your square.',
+                art:'up', next:'Measure' },
+  [M.MEAS90]: { step:'STEP 3',  title:'Hold still',
+                hint:'Don’t touch it.',
+                art:'up', bar:true },
+  [M.DONE]:   { step:'DONE',    title:'Level up',
+                hint:'Calibration saved to the device. It survives power off.',
+                art:'flat' },
+  [M.AUTO]:   { step:'AXES',    title:'Turn it over',
+                hint:'Rest it on a different face and hold still — it takes each one by itself. Tap Capture if it hesitates.',
+                art:'faces', next:'Capture', bar:true },
+  [M.AUTODONE]:{step:'DONE',    title:'Axes set',
+                hint:'Now run 2 POINT to set the zero.',
+                art:'faces' }
+};
+
+function openCal()  { calOpen = true;  $('cal').classList.remove('hide'); if (last) renderCal(last); }
+function closeCal() { calOpen = false; $('cal').classList.add('hide'); }
+
+function renderCal(p) {
+  const s = STEPS[p.mode];
+
+  // Прибор в обычном режиме - значит либо ещё не начали, либо всё кончилось.
+  // Показываем выбор способа.
+  if (!s) {
+    $('calPick').classList.remove('hide');
+    $('calStage').classList.add('hide');
+    $('calBar').classList.add('hide');
+    $('calNext').classList.add('hide');
+    $('calStep').textContent = 'CALIBRATION';
+    $('calTitle').textContent = 'Choose a method';
+    $('calHint').textContent = 'The level does the work — the phone just shows you where you are.';
+    $('calClose').textContent = 'Close';
+    return;
+  }
+
+  $('calPick').classList.add('hide');
+  $('calStep').textContent  = s.step;
+  $('calTitle').textContent = s.title;
+  $('calHint').textContent  = s.hint;
+  $('calClose').textContent = (p.mode === M.DONE || p.mode === M.AUTODONE) ? 'Close' : 'Cancel';
+
+  $('calStage').classList.remove('hide');
+  $('calStage').innerHTML = ART[s.art];
+
+  $('calBar').classList.toggle('hide', !s.bar);
+  if (s.bar) $('calBarFill').style.width = (p.prog * 100).toFixed(0) + '%';
+
+  $('calNext').classList.toggle('hide', !s.next);
+  if (s.next) $('calNext').textContent = s.next;
 }
 
 // --------------------------------------------------------------------------
@@ -294,14 +498,19 @@ $('btnConnect').onclick = () => {
   else connect();
 };
 
-$('btnZero').onclick = () => send('z');   // тот же язык, что в мониторе порта
-
-$('btnInfo').onclick = async () => {
-  if (!chInfo) return;
-  const v = await chInfo.readValue();
-  $('info').textContent = dec.decode(v);
-  $('info').classList.toggle('hide');
+$('btnZero').onclick = () => send('z');    // тот же язык, что в мониторе порта
+$('btnCal').onclick  = () => openCal();
+$('calClose').onclick = () => {
+  // «Cancel» на середине калибровки обязан вернуть прибор в обычный режим,
+  // а не просто закрыть экран: иначе прибор так и останется ждать шага,
+  // о котором человек уже забыл.
+  if (last && last.mode !== M.NORMAL && last.mode !== M.DONE && last.mode !== M.AUTODONE) send('x');
+  closeCal();
 };
+$('calNext').onclick = () => send('n');
+
+for (const b of document.querySelectorAll('#calPick button'))
+  b.onclick = () => send(b.dataset.cmd);
 
 // Разметка шкалы считается, а не вписана руками: поменяется BUBBLE_RANGE -
 // и деления с подписями съедут сами, а не начнут врать.
@@ -315,8 +524,7 @@ $('btnInfo').onclick = async () => {
   }
   // Зона допуска: 0.1 градуса от диапазона в 10 - это полпроцента ширины.
   // Две риски встали бы вплотную и слились в одну черту, поэтому у них есть
-  // нижняя граница разноса. Шкала при этом остаётся честной: риски
-  // обозначают зону, а не измеряют её.
+  // нижняя граница разноса.
   const p = Math.max(3.2, (LEVEL_TOL / BUBBLE_RANGE) * 50);
   $('tickL').style.left = (50 - p) + '%';
   $('tickR').style.left = (50 + p) + '%';
@@ -325,8 +533,8 @@ $('btnInfo').onclick = async () => {
 })();
 
 if (!navigator.bluetooth) {
-  note('Этот браузер не умеет Bluetooth.\nНа iPhone откройте страницу в Bluefy, на Android — в Chrome.', true);
+  note('This browser has no Bluetooth.\nOn iPhone open this page in Bluefy, on Android in Chrome.', true);
 } else {
-  note('Включите уровень и нажмите кнопку ниже.');
+  note('Switch the level on, then tap Connect.');
 }
 </script>
