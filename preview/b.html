@@ -1,0 +1,138 @@
+<title>B — Poster</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<style>
+/* ВАРИАНТ B — «Плакат».
+   Тот же фирменный жёлтый, но взятый всерьёз: чёрная типографика в упор,
+   толстые линейки, ни одного скругления, всё по левому краю. Это не
+   «приложение с кнопочками», а печатный лист, который живёт и меняется. */
+:root{ --bg:#ffd400; --ink:#0d0d0d; --dim:#7a6510; --bt:#0082fc;
+       --good:#0a6b3d; --bad:#8f1d1d; }
+*{box-sizing:border-box}
+body{margin:0;min-height:100svh;background:var(--bg);color:var(--ink);
+  font:15px/1.35 "Helvetica Neue",Arial,system-ui,sans-serif;
+  display:flex;flex-direction:column;padding:16px 18px 18px;gap:0}
+
+.rule{height:4px;background:var(--ink)}
+.rule.thin{height:1px}
+
+header{display:flex;align-items:center;gap:10px;padding-bottom:10px}
+.brand{font-size:13px;font-weight:800;letter-spacing:.24em}
+.sp{flex:1}
+.bt{width:10px;height:18px}
+.link{font-size:11px;font-weight:700;letter-spacing:.16em}
+
+.eyebrow{font-size:11px;font-weight:800;letter-spacing:.2em;margin:16px 0 2px}
+.huge{font-size:clamp(76px,30vw,132px);font-weight:800;letter-spacing:-.06em;
+  line-height:.82;font-variant-numeric:tabular-nums;margin:0}
+.huge sup{font-size:.34em;font-weight:700;vertical-align:super;letter-spacing:0}
+
+.dev{display:flex;align-items:flex-end;justify-content:space-between;margin:14px 0 8px}
+.dev .n{font-size:40px;font-weight:800;letter-spacing:-.03em;font-variant-numeric:tabular-nums}
+.dev .s{font-size:13px;font-weight:800;letter-spacing:.16em;padding-bottom:7px}
+
+/* ампула — прямая труба, без скруглений и бликов */
+.tube{position:relative;height:40px;border:3px solid var(--ink);margin:6px 0 0}
+.tube .t{position:absolute;top:0;bottom:0;width:1px;background:rgba(0,0,0,.35)}
+.tube .z{position:absolute;top:0;bottom:0;border-left:3px solid var(--ink);border-right:3px solid var(--ink)}
+.tube .b{position:absolute;top:5px;width:26px;height:26px;background:var(--ink);
+  margin-left:-13px;transition:left .1s linear}
+.ends{display:flex;justify-content:space-between;font-size:10px;font-weight:700;
+  letter-spacing:.1em;margin-top:5px;color:var(--dim)}
+
+.facts{margin-top:auto}
+.facts .r{display:flex;justify-content:space-between;padding:11px 0;
+  border-top:1px solid rgba(0,0,0,.28);font-size:14px}
+.facts .k{font-weight:800;letter-spacing:.14em;font-size:11px;padding-top:3px}
+.facts .v{font-weight:800;font-variant-numeric:tabular-nums}
+
+.acts{display:flex;gap:8px;margin-top:14px}
+.acts button{flex:1;font:inherit;font-size:12px;font-weight:800;letter-spacing:.16em;
+  padding:17px 6px;border:3px solid var(--ink);background:transparent;color:var(--ink)}
+.acts button.pri{background:var(--ink);color:var(--bg)}
+
+/* заставка */
+#sp{position:fixed;inset:0;background:var(--bg);z-index:9;overflow:hidden}
+#sp.out{opacity:0;transition:opacity .45s;pointer-events:none}
+#sp .bar{position:absolute;left:0;right:0;height:14px;background:var(--ink)}
+#sp .word{position:absolute;inset:0;display:grid;place-items:center}
+#sp .word span{font-size:46px;font-weight:800;letter-spacing:-.03em;display:inline-block;
+  transform:translateY(120%);}
+</style>
+
+<div id="sp">
+  <div class="word" id="wd"></div>
+</div>
+
+<header>
+  <span class="brand">LOLID</span><span class="sp"></span>
+  <svg class="bt" viewBox="0 0 12 24" fill="none" stroke="var(--bt)" stroke-width="2.3"
+       stroke-linecap="round" stroke-linejoin="round"><path d="M0 6 L12 18 L6 24 L6 0 L12 6 L0 18"/></svg>
+  <span class="link">LINKED</span>
+</header>
+<div class="rule"></div>
+
+<div class="eyebrow">ABSOLUTE ANGLE</div>
+<div class="huge">89.97<sup>°</sup></div>
+
+<div class="dev">
+  <span class="n" id="devn">−0.03°</span>
+  <span class="s" id="devs">PLUMB · OK</span>
+</div>
+
+<div class="tube" id="tube">
+  <div class="z" id="zone"></div>
+  <div class="b" id="bub"></div>
+</div>
+<div class="ends"><span>−10°</span><span>FROM 90°</span><span>+10°</span></div>
+
+<div class="facts">
+  <div class="r"><span class="k">CROSS</span><span class="v">+1.20°</span></div>
+  <div class="r"><span class="k">VECTOR |a|</span><span class="v">1.0001</span></div>
+  <div class="r"><span class="k">REFERENCE</span><span class="v">ABSOLUTE</span></div>
+</div>
+
+<div class="acts">
+  <button>SET ZERO</button><button class="pri">CALIBRATE</button>
+</div>
+
+<script>
+const dev=-0.03, RANGE=10, TOL=.1;
+const tube=document.getElementById('tube');
+for(let i=-4;i<=4;i++){ if(!i) continue; const t=document.createElement('div');
+  t.className='t'; t.style.left=(50+i*11)+'%'; tube.appendChild(t); }
+const z=document.getElementById('zone'), zp=Math.max(3,(TOL/RANGE)*50);
+z.style.left=(50-zp)+'%'; z.style.width=(zp*2)+'%';
+document.getElementById('bub').style.left=(50+dev/RANGE*46)+'%';
+
+// Заставка: две чёрные полосы сходятся к середине, как захлопывающийся
+// печатный станок, и выбрасывают слово. Буквы встают снизу, по одной.
+const sp=document.getElementById('sp');
+const top=document.createElement('div'), bot=document.createElement('div');
+top.className='bar'; bot.className='bar';
+top.style.top='-14px'; bot.style.bottom='-14px';
+sp.append(top,bot);
+const wd=document.getElementById('wd');
+const holder=document.createElement('div'); wd.appendChild(holder);
+[..."LOLID"].forEach(ch=>{const s=document.createElement('span');s.textContent=ch;holder.appendChild(s);});
+const letters=[...holder.children];
+
+// Запуск через setTimeout, а НЕ requestAnimationFrame: rAF не тикает, пока
+// вкладка не на экране, и вся цепочка заставки повисала бы навсегда - человек
+// свернул бы приложение на секунду и вернулся к залипшему жёлтому экрану.
+setTimeout(()=>{
+  top.style.transition=bot.style.transition='transform .55s cubic-bezier(.2,.8,.2,1)';
+  top.style.transform='translateY(46vh)'; bot.style.transform='translateY(-46vh)';
+  letters.forEach((l,i)=>{
+    l.style.transition='transform .42s cubic-bezier(.2,.9,.2,1)';
+    setTimeout(()=>l.style.transform='translateY(0)', 560+i*70);
+  });
+  setTimeout(()=>{
+    top.style.transform='translateY(-20vh)'; bot.style.transform='translateY(20vh)';
+  }, 1500);
+  setTimeout(()=>{ sp.classList.add('out'); setTimeout(()=>sp.remove(),500); }, 2000);
+}, 16);
+
+// Страховка: что бы ни случилось с анимацией, заставка обязана уйти.
+// Экран, с которого нет выхода, хуже отсутствия заставки вообще.
+setTimeout(()=>{ const s=document.getElementById('sp'); if(s) s.remove(); }, 3500);
+</script>

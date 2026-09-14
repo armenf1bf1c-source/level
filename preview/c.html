@@ -1,0 +1,143 @@
+<title>C — Tool</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<style>
+/* ВАРИАНТ C — «Инструмент в руке».
+   Главный герой экрана — сам уровень, нарисованный как вещь: оранжевый
+   корпус, стеклянная ампула, настоящий пузырёк. Цифры подчинены ему.
+   Фон тёплый серый, как верстак, и на нём оранжевый и жёлтый звучат.
+   Приложение не «показывает данные», а показывает ваш инструмент. */
+:root{
+  --bg:#cfcabe; --bg2:#bdb7a9; --ink:#1b1916; --dim:#6a6458;
+  --orange:#e07b1a; --orange-d:#a8560e; --glass:#ffd400; --bt:#0082fc;
+  --good:#1d6b3f; --warn:#a9601a; --bad:#8f2020;
+}
+*{box-sizing:border-box}
+body{margin:0;min-height:100svh;color:var(--ink);
+  background:linear-gradient(160deg,var(--bg),var(--bg2));
+  font:15px/1.4 -apple-system,BlinkMacSystemFont,system-ui,sans-serif;
+  display:flex;flex-direction:column;padding:18px;gap:14px}
+
+header{display:flex;align-items:center;gap:9px}
+.brand{font-size:12px;font-weight:800;letter-spacing:.2em;color:var(--dim)}
+.sp{flex:1}
+.bt{width:10px;height:18px}
+.link{font-size:11px;color:var(--dim)}
+
+/* герой: сам инструмент */
+.tool{position:relative;height:118px;border-radius:14px;
+  background:linear-gradient(180deg,#ee8d2a,var(--orange) 55%,var(--orange-d));
+  box-shadow:0 10px 24px rgba(0,0,0,.28), inset 0 2px 0 rgba(255,255,255,.35);
+  display:grid;place-items:center;overflow:hidden}
+.tool::before,.tool::after{content:"";position:absolute;top:8px;bottom:8px;width:14px;
+  background:rgba(0,0,0,.22);border-radius:5px}
+.tool::before{left:10px} .tool::after{right:10px}
+
+.vial{position:relative;width:74%;height:52px;border-radius:26px;
+  background:linear-gradient(180deg,#fff0a8,var(--glass));
+  box-shadow:inset 0 3px 7px rgba(0,0,0,.30), 0 1px 0 rgba(255,255,255,.4);
+  overflow:hidden}
+.vial .g{position:absolute;left:18px;right:18px;top:6px;height:5px;border-radius:3px;
+  background:rgba(255,255,255,.65)}
+.vial .t{position:absolute;top:9px;bottom:9px;width:2px;background:rgba(0,0,0,.45)}
+.bub{position:absolute;top:8px;width:36px;height:36px;margin-left:-18px;border-radius:50%;
+  background:radial-gradient(circle at 34% 30%,#eafff4,#2f8f63 62%,#17553b);
+  box-shadow:0 2px 5px rgba(0,0,0,.3);transition:left .1s linear}
+
+.read{display:flex;align-items:baseline;justify-content:center;gap:4px;margin-top:2px}
+.read .n{font-size:64px;font-weight:700;letter-spacing:-.035em;font-variant-numeric:tabular-nums}
+.read .u{font-size:26px;color:var(--dim)}
+.verd{text-align:center;font-size:13px;font-weight:800;letter-spacing:.16em}
+.from{text-align:center;font-size:11px;letter-spacing:.16em;color:var(--dim);margin-top:-4px}
+
+.plate{margin-top:auto;display:flex;gap:10px}
+.plate .c{flex:1;background:rgba(255,255,255,.34);border:1px solid rgba(0,0,0,.10);
+  border-radius:11px;padding:10px 8px;text-align:center;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.7)}
+.plate .k{font-size:9px;letter-spacing:.16em;color:var(--dim)}
+.plate .v{font-size:18px;font-weight:700;margin-top:2px;font-variant-numeric:tabular-nums}
+
+.acts{display:flex;gap:10px}
+.acts button{flex:1;font:inherit;font-size:13px;font-weight:700;letter-spacing:.06em;
+  padding:16px 6px;border-radius:12px;border:1px solid rgba(0,0,0,.18);
+  background:linear-gradient(180deg,#fff,#e3ded2);color:var(--ink);
+  box-shadow:0 2px 5px rgba(0,0,0,.14)}
+.acts button.pri{background:linear-gradient(180deg,#ee8d2a,var(--orange-d));color:#fff;
+  border-color:rgba(0,0,0,.28)}
+
+/* заставка */
+#sp{position:fixed;inset:0;z-index:9;display:grid;place-items:center;
+  background:linear-gradient(160deg,var(--bg),var(--bg2));overflow:hidden}
+#sp.out{opacity:0;transition:opacity .5s;pointer-events:none}
+#sp .w{position:absolute;bottom:31%;font-family:Georgia,"Times New Roman",serif;
+  font-style:italic;font-weight:700;font-size:40px;opacity:0;transition:opacity .6s}
+#spTool{width:76%;max-width:320px}
+</style>
+
+<div id="sp">
+  <svg id="spTool" viewBox="0 0 320 96">
+    <g id="spg">
+      <rect x="6" y="26" width="308" height="44" rx="9" fill="#e07b1a" stroke="#1b1916" stroke-width="3"/>
+      <rect x="22" y="36" width="16" height="24" rx="4" fill="rgba(0,0,0,.25)"/>
+      <rect x="282" y="36" width="16" height="24" rx="4" fill="rgba(0,0,0,.25)"/>
+      <rect x="112" y="34" width="96" height="28" rx="14" fill="#ffd400" stroke="#1b1916" stroke-width="2.5"/>
+      <line x1="148" y1="38" x2="148" y2="58" stroke="#1b1916" stroke-width="2"/>
+      <line x1="172" y1="38" x2="172" y2="58" stroke="#1b1916" stroke-width="2"/>
+      <circle id="spb" cx="160" cy="48" r="10" fill="#2f8f63" stroke="#17553b" stroke-width="2"/>
+    </g>
+  </svg>
+  <div class="w" id="spw">Lolid</div>
+</div>
+
+<header>
+  <span class="brand">LOLID LEVEL</span><span class="sp"></span>
+  <svg class="bt" viewBox="0 0 12 24" fill="none" stroke="var(--bt)" stroke-width="2.3"
+       stroke-linecap="round" stroke-linejoin="round"><path d="M0 6 L12 18 L6 24 L6 0 L12 6 L0 18"/></svg>
+  <span class="link">linked</span>
+</header>
+
+<div class="tool">
+  <div class="vial" id="vial">
+    <div class="g"></div>
+    <div class="bub" id="bub"></div>
+  </div>
+</div>
+
+<div class="read"><span class="n">89.97</span><span class="u">°</span></div>
+<div class="from">FROM 90°</div>
+<div class="verd" id="verd" style="color:var(--good)">PLUMB — OK &nbsp;·&nbsp; −0.03°</div>
+
+<div class="plate">
+  <div class="c"><div class="k">CROSS</div><div class="v">+1.20°</div></div>
+  <div class="c"><div class="k">|a|</div><div class="v" style="color:var(--good)">1.0001</div></div>
+  <div class="c"><div class="k">MODE</div><div class="v">ABS</div></div>
+</div>
+
+<div class="acts"><button>Set zero</button><button class="pri">Calibrate</button></div>
+
+<script>
+const dev=-0.03, RANGE=10, TOL=.1;
+const vial=document.getElementById('vial');
+[-1,1].forEach(s=>{const t=document.createElement('div');t.className='t';
+  t.style.left='calc(50% '+(s<0?'-':'+')+' 22px)';vial.appendChild(t);});
+document.getElementById('bub').style.left=(50+dev/RANGE*40)+'%';
+
+// Заставка: инструмент опускается на верстак, пузырёк докачивается до
+// середины и замирает — то же, что делает настоящий уровень в руке.
+const g=document.getElementById('spg'), b=document.getElementById('spb'), w=document.getElementById('spw');
+const t0=performance.now();
+(function tick(now){
+  const t=(now-t0)/1000;
+  const a=-11*Math.exp(-2.4*t)*Math.cos(t*7.2);      // качание корпуса
+  const y=Math.max(0,26*Math.exp(-4.5*t));            // посадка сверху
+  g.setAttribute('transform',`translate(0 ${-y.toFixed(1)}) rotate(${a.toFixed(2)} 160 48)`);
+  b.setAttribute('cx', (160 + 26*Math.exp(-2.1*t)*Math.cos(t*6.1)).toFixed(1));
+  if(t>1.5) w.style.opacity=Math.min(1,(t-1.5)/.7).toFixed(2);
+  if(t<2.7) requestAnimationFrame(tick);
+  else { const s=document.getElementById('sp'); s.classList.add('out'); setTimeout(()=>s.remove(),600); }
+})(t0);
+
+// Страховка: rAF не тикает, пока вкладка не на экране, и цикл выше может
+// просто не дойти до конца. Экран, с которого нет выхода, хуже отсутствия
+// заставки вообще - поэтому снимаем её по времени, что бы ни случилось.
+setTimeout(()=>{ const s=document.getElementById('sp'); if(s) s.remove(); }, 3600);
+</script>

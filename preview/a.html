@@ -1,0 +1,135 @@
+<title>A — Instrument</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<style>
+/* ВАРИАНТ A — «Прибор».
+   Тёмный корпус, жёлтый только как свет на шкале. Цифры моноширинные,
+   линии тонкие. Приложение выглядит как показывающая головка инструмента,
+   а не как страница. Жёлтого мало — поэтому он работает. */
+:root{
+  --bg:#0e0f10; --panel:#16181a; --line:#23262a;
+  --ink:#f1f0ec; --dim:#7d8288; --acc:#ffd400; --bt:#0082fc;
+  --good:#3ddc97; --warn:#ffa640; --bad:#ff5c5c;
+}
+*{box-sizing:border-box}
+body{margin:0;min-height:100svh;background:var(--bg);color:var(--ink);
+  font:15px/1.4 -apple-system,BlinkMacSystemFont,system-ui,sans-serif;
+  display:flex;flex-direction:column;padding:18px;gap:16px}
+.mono{font-family:ui-monospace,"SF Mono",Menlo,monospace;font-variant-numeric:tabular-nums}
+
+header{display:flex;align-items:center;gap:10px;font-size:11px;letter-spacing:.2em;color:var(--dim)}
+header .sp{flex:1}
+.bt{width:11px;height:19px}
+
+.read{display:flex;align-items:baseline;justify-content:flex-end;gap:6px;margin-top:6px}
+.read .n{font-size:74px;font-weight:600;letter-spacing:-.04em;line-height:.9}
+.read .u{font-size:26px;color:var(--dim)}
+.sub{display:flex;justify-content:space-between;font-size:11px;letter-spacing:.16em;color:var(--dim)}
+
+/* Шкала: не «капсула с шариком», а настоящая линейка с указателем. */
+.scale{position:relative;height:74px;margin-top:4px}
+.scale .axis{position:absolute;left:0;right:0;top:44px;height:1px;background:var(--line)}
+.scale .t{position:absolute;top:36px;width:1px;height:9px;background:var(--line)}
+.scale .t.big{top:30px;height:15px;background:#3a3e43}
+.scale .zone{position:absolute;top:30px;height:15px;background:rgba(61,220,151,.22);
+  border-left:1px solid var(--good);border-right:1px solid var(--good)}
+.scale .ptr{position:absolute;top:8px;width:0;height:0;margin-left:-8px;
+  border-left:8px solid transparent;border-right:8px solid transparent;border-top:14px solid var(--acc);
+  filter:drop-shadow(0 0 10px rgba(255,212,0,.5))}
+.scale .val{position:absolute;top:52px;transform:translateX(-50%);font-size:13px;color:var(--acc)}
+.scale .lbl{position:absolute;top:56px;font-size:10px;color:var(--dim)}
+
+/* Середина держит показание по центру экрана, а таблица и кнопки прижаты
+   к низу. Без этого показание липло к шапке и под ним зияла пустота. */
+.mid{flex:1;display:flex;flex-direction:column;justify-content:center;gap:2px}
+.grid{border-top:1px solid var(--line)}
+.grid .r{display:flex;border-bottom:1px solid var(--line)}
+.grid .c{flex:1;padding:12px 4px;border-right:1px solid var(--line)}
+.grid .c:last-child{border-right:0}
+.grid .k{font-size:9px;letter-spacing:.18em;color:var(--dim)}
+.grid .v{font-size:19px;margin-top:3px}
+
+.acts{display:flex;gap:1px;background:var(--line);border:1px solid var(--line)}
+.acts button{flex:1;font:inherit;font-size:12px;letter-spacing:.14em;padding:16px 4px;
+  background:var(--panel);color:var(--ink);border:0}
+.acts button.pri{background:var(--acc);color:#111;font-weight:700}
+
+/* заставка */
+#sp{position:fixed;inset:0;background:var(--bg);display:grid;place-items:center;z-index:9}
+#sp.out{opacity:0;transition:opacity .5s;pointer-events:none}
+#sp svg{width:230px}
+#sp .w{font:600 13px/1 ui-monospace,monospace;letter-spacing:.7em;fill:var(--acc)}
+</style>
+
+<div id="sp">
+  <svg viewBox="0 0 230 120">
+    <!-- линия качается и встаёт ровно: это буквально то, что делает прибор -->
+    <g id="ln"><line x1="35" y1="52" x2="195" y2="52" stroke="#ffd400" stroke-width="2"/>
+      <line x1="35" y1="44" x2="35" y2="60" stroke="#4a4a3a" stroke-width="2"/>
+      <line x1="195" y1="44" x2="195" y2="60" stroke="#4a4a3a" stroke-width="2"/></g>
+    <text class="w" id="wd" x="115" y="92" text-anchor="middle" opacity="0">LOLID</text>
+  </svg>
+</div>
+
+<header>
+  <span>LOLID</span><span class="sp"></span>
+  <svg class="bt" viewBox="0 0 12 24" fill="none" stroke="var(--bt)" stroke-width="2.2"
+       stroke-linecap="round" stroke-linejoin="round"><path d="M0 6 L12 18 L6 24 L6 0 L12 6 L0 18"/></svg>
+  <span>LINKED</span>
+</header>
+
+<div class="mid">
+<div class="sub"><span>ABSOLUTE</span><span>FROM 90°</span></div>
+<div class="read"><span class="n mono">89.97</span><span class="u">°</span></div>
+
+<div class="scale">
+  <div class="axis"></div>
+  <div class="zone" id="zone"></div>
+  <div class="ptr" id="ptr"></div>
+  <div class="val mono" id="pval">−0.03°</div>
+  <span class="lbl" style="left:0">−10</span>
+  <span class="lbl" style="right:0">+10</span>
+</div>
+</div>
+
+<div class="grid">
+  <div class="r">
+    <div class="c"><div class="k">CROSS</div><div class="v mono">+1.20°</div></div>
+    <div class="c"><div class="k">VECTOR |a|</div><div class="v mono" style="color:var(--good)">1.0001</div></div>
+    <div class="c"><div class="k">STATUS</div><div class="v" style="color:var(--good);font-size:15px">PLUMB OK</div></div>
+  </div>
+</div>
+
+<div class="acts">
+  <button>SET ZERO</button><button>CALIBRATE</button><button class="pri">LINKED</button>
+</div>
+
+<script>
+const dev=-0.03, RANGE=10, TOL=.1;
+const sc=document.querySelector('.scale');
+for(let i=-5;i<=5;i++){const t=document.createElement('div');
+  t.className='t'+(i%5===0?' big':'');t.style.left=(50+i*10)+'%';sc.insertBefore(t,document.getElementById('zone'));}
+const z=document.getElementById('zone');
+const zp=Math.max(1.6,(TOL/RANGE)*50);
+z.style.left=(50-zp)+'%';z.style.width=(zp*2)+'%';
+const x=50+dev/RANGE*50;
+document.getElementById('ptr').style.left=x+'%';
+document.getElementById('pval').style.left=x+'%';
+
+// Заставка: линия качается с затуханием и замирает ровно, потом проявляется
+// слово. Один тон, ничего лишнего — как на самом приборе.
+const ln=document.getElementById('ln'), wd=document.getElementById('wd');
+const t0=performance.now();
+(function tick(now){
+  const t=(now-t0)/1000;
+  const a=-17*Math.exp(-2.6*t)*Math.cos(t*8.4);
+  ln.setAttribute('transform',`rotate(${a.toFixed(2)} 115 52)`);
+  if(t>1.5) wd.setAttribute('opacity', Math.min(1,(t-1.5)/.6).toFixed(2));
+  if(t<2.6) requestAnimationFrame(tick);
+  else { const s=document.getElementById('sp'); s.classList.add('out'); setTimeout(()=>s.remove(),600); }
+})(t0);
+
+// Страховка: rAF не тикает, пока вкладка не на экране, и цикл выше может
+// просто не дойти до конца. Экран, с которого нет выхода, хуже отсутствия
+// заставки вообще - поэтому снимаем её по времени, что бы ни случилось.
+setTimeout(()=>{ const s=document.getElementById('sp'); if(s) s.remove(); }, 3600);
+</script>
