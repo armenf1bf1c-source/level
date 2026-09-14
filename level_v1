@@ -1,0 +1,324 @@
+<title>Lolid Level</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<style>
+  /* Страница носит лицо самого прибора: тот же жёлтый, те же чёрные цифры.
+     Тёмной темы здесь нет намеренно - у инструмента один вид. */
+  :root {
+    --bg:    #ffd400;   /* фирменный жёлтый, как COL_BG в прошивке */
+    --card:  #f0b400;
+    --ink:   #181818;
+    --muted: #6b5a20;
+    --good:  #00734f;
+    --warn:  #b35a10;
+    --bad:   #992222;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  body {
+    margin: 0; min-height: 100svh;
+    background: var(--bg); color: var(--ink);
+    font: 16px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    display: flex; flex-direction: column;
+    padding: max(16px, env(safe-area-inset-top)) 18px max(16px, env(safe-area-inset-bottom));
+    gap: 14px;
+  }
+
+  header { display: flex; align-items: center; gap: 10px; }
+  .brand { font-size: 12px; font-weight: 800; letter-spacing: .18em; color: var(--muted); }
+  .spacer { flex: 1; }
+  .dot { width: 10px; height: 10px; border-radius: 50%; background: #0003; }
+  .dot.on { background: var(--good); }
+  .state { font-size: 12px; color: var(--muted); }
+
+  main { flex: 1; display: flex; flex-direction: column; justify-content: center; gap: 10px; }
+
+  .angle {
+    font-size: clamp(56px, 22vw, 96px); font-weight: 800; text-align: center;
+    font-variant-numeric: tabular-nums; letter-spacing: -.02em; line-height: 1;
+  }
+  .refline { text-align: center; font-size: 12px; font-weight: 700;
+             letter-spacing: .12em; color: var(--muted); }
+
+  /* ампула */
+  .vial { position: relative; height: 62px; border-radius: 31px;
+          background: var(--card); border: 1px solid #0002; overflow: hidden; }
+  .gloss{ position: absolute; left: 31px; right: 31px; top: 6px; height: 3px;
+          border-radius: 2px; background: #fff8; }
+  /* деления шкалы - как на приборе */
+  .div  { position: absolute; top: 26px; width: 2px; height: 10px;
+          margin-left: -1px; background: #0003; }
+  .div.mid { top: 20px; height: 22px; background: #0005; }
+  /* Зона допуска. Ширина считается из LEVEL_TOL, но с нижней границей:
+     0.1 от 10 градусов - это полпроцента шкалы, две риски слились бы
+     в одну черту и перестали что-либо показывать. */
+  .tick { position: absolute; top: 12px; bottom: 12px; width: 2px;
+          margin-left: -1px; background: var(--good); opacity: .7; }
+  .bub  { position: absolute; top: 7px; width: 48px; height: 48px; border-radius: 50%;
+          left: 50%; margin-left: -24px; transition: transform .08s linear;
+          display: grid; place-items: center; background: #0002; }
+  .bub::after { content: ""; width: 22px; height: 22px; border-radius: 50%; background: var(--card); }
+  .ends { position: absolute; inset: 0; display: flex; align-items: center;
+          justify-content: space-between; padding: 0 14px;
+          font-size: 11px; color: var(--muted); pointer-events: none; }
+
+  .dev    { text-align: center; font-size: 30px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .verdict{ text-align: center; font-size: 17px; font-weight: 700; letter-spacing: .06em; }
+
+  .cells { display: flex; gap: 6px; }
+  .cell  { flex: 1; text-align: center; padding: 8px 4px; }
+  .cell .k { font-size: 10px; letter-spacing: .1em; color: var(--muted); }
+  .cell .v { font-size: 17px; font-weight: 700; font-variant-numeric: tabular-nums; }
+
+  .row { display: flex; gap: 10px; }
+  button {
+    flex: 1; font: inherit; font-weight: 700; padding: 15px 10px; border-radius: 13px;
+    border: 2px solid var(--ink); background: var(--ink); color: var(--bg); cursor: pointer;
+  }
+  button.ghost { background: transparent; color: var(--ink); }
+  button:disabled { opacity: .35; }
+
+  .note { font-size: 13px; color: var(--muted); text-align: center; min-height: 1.4em;
+          white-space: pre-wrap; }
+  .err  { color: var(--bad); font-weight: 600; }
+  pre   { background: #0000000d; padding: 12px; border-radius: 10px; font-size: 12px;
+          overflow-x: auto; margin: 0; }
+  .hide { display: none !important; }
+</style>
+
+<header>
+  <span class="brand">LOLID LEVEL</span>
+  <span class="spacer"></span>
+  <span class="dot" id="dot"></span>
+  <span class="state" id="state">не подключено</span>
+</header>
+
+<main>
+  <div class="angle" id="angle">—</div>
+  <div class="refline" id="refline">&nbsp;</div>
+
+  <div class="vial" id="vial">
+    <div class="gloss"></div>
+    <div class="tick" id="tickL"></div>
+    <div class="tick" id="tickR"></div>
+    <div class="bub" id="bub"></div>
+    <div class="ends"><span id="endL">-10</span><span id="endR">+10</span></div>
+  </div>
+
+  <div class="dev" id="dev">&nbsp;</div>
+  <div class="verdict" id="verdict">&nbsp;</div>
+
+  <div class="cells">
+    <div class="cell"><div class="k">CROSS</div><div class="v" id="cross">—</div></div>
+    <div class="cell"><div class="k">|a|</div><div class="v" id="mag">—</div></div>
+    <div class="cell"><div class="k">РЕЖИМ</div><div class="v" id="mode">—</div></div>
+  </div>
+</main>
+
+<div class="row">
+  <button id="btnConnect">Подключить уровень</button>
+</div>
+<div class="row hide" id="rowLive">
+  <button id="btnZero" class="ghost">Взять ноль</button>
+  <button id="btnInfo" class="ghost">О приборе</button>
+</div>
+
+<div class="note" id="note"></div>
+<pre id="info" class="hide"></pre>
+
+<script>
+// ============================================================================
+//  Связь с прибором через Web Bluetooth.
+//
+//  В Safari этого нет и не будет - Apple Web Bluetooth не поддерживает.
+//  Страницу надо открывать в браузере Bluefy из App Store: он именно для
+//  этого и сделан. На Android достаточно обычного Chrome.
+//
+//  Ещё одно требование, которое ловит всех: страница должна открываться по
+//  HTTPS. По http:// или из файла Web Bluetooth молчит - это не каприз
+//  браузера, а условие безопасности.
+// ============================================================================
+
+// Номера обязаны совпадать с ble.cpp в прошивке. Первые четыре байта - "loli".
+// Web Bluetooth принимает их ТОЛЬКО строчными буквами.
+const SVC  = '6c6f6c69-6400-1000-8000-00805f9b34fb';
+const MEAS = '6c6f6c69-6401-1000-8000-00805f9b34fb';
+const CMD  = '6c6f6c69-6402-1000-8000-00805f9b34fb';
+const INFO = '6c6f6c69-6403-1000-8000-00805f9b34fb';
+
+// Должны совпадать с config.h прибора, иначе страница начнёт врать о шкале.
+const BUBBLE_RANGE = 10.0;   // BUBBLE_RANGE
+const LEVEL_TOL    = 0.10;   // LEVEL_TOL
+
+const $ = id => document.getElementById(id);
+let device = null, chCmd = null, chInfo = null;
+
+const dec = new TextDecoder();
+const enc = new TextEncoder();
+
+function setState(text, live) {
+  $('state').textContent = text;
+  $('dot').classList.toggle('on', !!live);
+  $('rowLive').classList.toggle('hide', !live);
+  $('btnConnect').textContent = live ? 'Отключить' : 'Подключить уровень';
+}
+
+function note(msg, isErr) {
+  $('note').textContent = msg || '';
+  $('note').className = 'note' + (isErr ? ' err' : '');
+}
+
+// --------------------------------------------------------------------------
+//  Подключение. requestDevice() обязан вызываться из настоящего нажатия -
+//  браузер не даст странице открыть выбор устройств самостоятельно.
+// --------------------------------------------------------------------------
+async function connect() {
+  if (!navigator.bluetooth) {
+    note('Этот браузер не умеет Bluetooth.\nНа iPhone откройте страницу в Bluefy, на Android — в Chrome.', true);
+    return;
+  }
+  try {
+    note('');
+    setState('ищу прибор…', false);
+
+    // Фильтр по номеру службы - не украшение: без него в списке окажутся
+    // все наушники и часы в радиусе десяти метров.
+    device = await navigator.bluetooth.requestDevice({ filters: [{ services: [SVC] }] });
+    device.addEventListener('gattserverdisconnected', onDisconnected);
+
+    setState('подключаюсь…', false);
+    const server = await device.gatt.connect();
+    const svc = await server.getPrimaryService(SVC);
+
+    chCmd  = await svc.getCharacteristic(CMD);
+    chInfo = await svc.getCharacteristic(INFO);
+
+    const meas = await svc.getCharacteristic(MEAS);
+    meas.addEventListener('characteristicvaluechanged', onMeas);
+    // Вот это и есть подписка. Без неё прибор не шлёт НИЧЕГО и молча ждёт -
+    // так устроен BLE, это экономит батарею.
+    await meas.startNotifications();
+
+    chCmd.addEventListener('characteristicvaluechanged', e => {
+      note(dec.decode(e.target.value).trim());
+    });
+    await chCmd.startNotifications();
+
+    setState('на связи', true);
+  } catch (e) {
+    setState('не подключено', false);
+    // Отмена выбора устройства - не ошибка, человек просто закрыл список.
+    if (e && e.name === 'NotFoundError') note('');
+    else note('Не вышло: ' + (e && e.message ? e.message : e), true);
+  }
+}
+
+function onDisconnected() {
+  setState('не подключено', false);
+  $('angle').textContent = '—';
+  $('cross').textContent = $('mag').textContent = $('mode').textContent = '—';
+  $('dev').innerHTML = $('verdict').innerHTML = $('refline').innerHTML = '&nbsp;';
+  note('Прибор отключился. Нажмите «Подключить уровень».');
+}
+
+// --------------------------------------------------------------------------
+//  Разбор пакета: 16 байт, младший байт первым (true в getFloat32).
+//     0  float  главный угол, уже с учётом REL-нуля
+//     4  float  поперечный
+//     8  float  |a|
+//    12  uint8  режим прибора
+//    13  uint8  флаги: бит0 REL, бит1 стоит на торце
+//    14  uint16 счётчик посылок
+// --------------------------------------------------------------------------
+function onMeas(e) {
+  const d = e.target.value;
+  if (d.byteLength < 16) return;
+
+  const a    = d.getFloat32(0, true);
+  const b    = d.getFloat32(4, true);
+  const mag  = d.getFloat32(8, true);
+  const flags= d.getUint8(13);
+  const rel  = (flags & 0x01) !== 0;
+
+  // Опора - ближайшая из 0, ±90, ±180. Та же логика, что рисует пузырёк
+  // на самом приборе: если считать по-своему, два экрана разойдутся.
+  const t = Math.abs(a);
+  let dev, ref;
+  if (t >= 135)     { dev = a > 0 ? a - 180 : a + 180; ref = 180; }
+  else if (t >= 45) { dev = a > 0 ? a -  90 : a +  90; ref =  90; }
+  else              { dev = a;                          ref =   0; }
+
+  const ad = Math.abs(dev);
+  const col = ad < LEVEL_TOL ? 'var(--good)'
+            : ad < BUBBLE_RANGE * 0.35 ? 'var(--warn)' : 'var(--bad)';
+
+  $('angle').textContent = a.toFixed(2) + '°';
+  $('refline').textContent = 'ОТ ' + ref + '°';
+
+  $('dev').textContent = (dev >= 0 ? '+' : '') + dev.toFixed(2) + '°';
+  $('dev').style.color = col;
+
+  $('verdict').textContent = (ref === 0 ? 'ГОРИЗОНТ' : 'ОТВЕС') + (ad < LEVEL_TOL ? ' — РОВНО' : ' — НЕТ');
+  $('verdict').style.color = col;
+
+  $('cross').textContent = b.toFixed(2) + '°';
+  $('mode').textContent  = rel ? 'REL' : 'ABS';
+
+  // |a| обязана быть 1.000 в ЛЮБОМ положении: сила тяжести от поворота не
+  // меняется. Отклонение - прямая мера того, как плохо откалиброваны оси.
+  $('mag').textContent = mag.toFixed(4);
+  $('mag').style.color = Math.abs(mag - 1) < 0.004 ? 'var(--good)' : 'var(--warn)';
+
+  const v = $('bub');
+  const cl = Math.max(-BUBBLE_RANGE, Math.min(BUBBLE_RANGE, dev));
+  const travel = (v.parentElement.clientWidth / 2) - 30;
+  v.style.transform = 'translateX(' + (cl / BUBBLE_RANGE * travel).toFixed(1) + 'px)';
+  v.style.background = col;
+}
+
+// --------------------------------------------------------------------------
+
+async function send(cmd) {
+  if (!chCmd) return;
+  await chCmd.writeValue(enc.encode(cmd));
+}
+
+$('btnConnect').onclick = () => {
+  if (device && device.gatt.connected) device.gatt.disconnect();
+  else connect();
+};
+
+$('btnZero').onclick = () => send('z');   // тот же язык, что в мониторе порта
+
+$('btnInfo').onclick = async () => {
+  if (!chInfo) return;
+  const v = await chInfo.readValue();
+  $('info').textContent = dec.decode(v);
+  $('info').classList.toggle('hide');
+};
+
+// Разметка шкалы считается, а не вписана руками: поменяется BUBBLE_RANGE -
+// и деления с подписями съедут сами, а не начнут врать.
+(function drawScale() {
+  const vial = $('vial');
+  for (let i = -2; i <= 2; i++) {
+    const d = document.createElement('div');
+    d.className = 'div' + (i === 0 ? ' mid' : '');
+    d.style.left = (50 + i * 20) + '%';
+    vial.insertBefore(d, $('tickL'));
+  }
+  // Зона допуска: 0.1 градуса от диапазона в 10 - это полпроцента ширины.
+  // Две риски встали бы вплотную и слились в одну черту, поэтому у них есть
+  // нижняя граница разноса. Шкала при этом остаётся честной: риски
+  // обозначают зону, а не измеряют её.
+  const p = Math.max(3.2, (LEVEL_TOL / BUBBLE_RANGE) * 50);
+  $('tickL').style.left = (50 - p) + '%';
+  $('tickR').style.left = (50 + p) + '%';
+  $('endL').textContent = '-' + BUBBLE_RANGE;
+  $('endR').textContent = '+' + BUBBLE_RANGE;
+})();
+
+if (!navigator.bluetooth) {
+  note('Этот браузер не умеет Bluetooth.\nНа iPhone откройте страницу в Bluefy, на Android — в Chrome.', true);
+} else {
+  note('Включите уровень и нажмите кнопку ниже.');
+}
+</script>
