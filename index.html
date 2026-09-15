@@ -329,6 +329,13 @@ var LL=142, LT=16, DD=22, HL=LL/2, HT=LT/2, HD=DD/2;
 var LOC=[[-HL,-HT,-HD],[HL,-HT,-HD],[HL,HT,-HD],[-HL,HT,-HD],
          [-HL,-HT,HD],[HL,-HT,HD],[HL,HT,HD],[-HL,HT,HD]];
 var BFACES=[[4,5,6,7],[1,0,3,2],[5,1,2,6],[0,4,7,3],[0,1,5,4],[7,6,2,3]];
+// Ребро и две грани, которым оно принадлежит. Светлую складку рисуем ТОЛЬКО
+// если видны обе - это настоящее внутреннее ребро корпуса. По силуэту не
+// рисуется ничего: обводка идёт по центру ребра и половиной толщины ложится
+// НАРУЖУ, на стол или на соседнее тело, и читается щелью в месте касания.
+var BEDGE=[[4,5,0,4],[5,6,0,2],[6,7,0,5],[7,4,0,3],[0,1,1,4],[1,2,1,2],
+           [2,3,1,5],[3,0,1,3],[1,5,2,4],[2,6,2,5],[0,4,3,4],[3,7,3,5]];
+
 var LIGHT=(function(){var v=[-0.34,0.86,0.38],n=Math.hypot(v[0],v[1],v[2]);
   return [v[0]/n,v[1]/n,v[2]/n];})();
 
@@ -406,7 +413,7 @@ function fitScene(sc){
 
 /* ---------------------- калибровка осей: вращение ---------------------- */
 var AX_SEQ=[0,0,1,2,2,1];   // этот порядок обходит все шесть сторон
-var AX_EXT=34, AX_EXT_FROM=[HL,HT,HD], AX_TURN=3.2, AX_HOLD=1.6;
+var AX_EXT=46, AX_GAP=1.5, AX_EXT_FROM=[HL,HT,HD], AX_TURN=3.2, AX_HOLD=1.6;
 var AXVIEW=m_mul(m_rot(0,-0.32), m_rot(1,0.55));
 var axS=1;
 function axOff(p){ var q=m_ap(AXVIEW,p), k=1600/(1600-q[2]); return [q[0]*k,-q[1]*k]; }
@@ -445,14 +452,24 @@ function shadeFace(W,f){
 
 // Тело уровня: грани со светотенью по НАСТОЯЩЕЙ нормали и одному источнику
 // света. Постоянный тон на грань смотрелся бы краской, а не объёмом.
+function bodySVG(W,P){
+  var vis=[], out='', i;
+  for(i=0;i<BFACES.length;i++){ var f=BFACES[i]; vis[i]=cwf(P[f[0]],P[f[1]],P[f[2]]); }
+  for(i=0;i<BFACES.length;i++){ if(!vis[i]) continue; var f=BFACES[i];
+    out+='<polygon points="'+pstr(f.map(function(k){return P[k];}))+
+         '" fill="#0d0d0d" fill-opacity="'+(1-0.30*shadeFace(W,f)).toFixed(3)+
+         '" stroke="none"/>'; }
+  for(i=0;i<BEDGE.length;i++){ var e=BEDGE[i];
+    if(!vis[e[2]]||!vis[e[3]]) continue;
+    out+='<line x1="'+P[e[0]][0].toFixed(1)+'" y1="'+P[e[0]][1].toFixed(1)+
+         '" x2="'+P[e[1]][0].toFixed(1)+'" y2="'+P[e[1]][1].toFixed(1)+
+         '" stroke="#ffd400" stroke-width="1.1" stroke-opacity="0.75"/>'; }
+  return out;
+}
+
 function drawLevel(d){
   var W=LOC.map(function(v){ return v_add(m_ap(d.R,v),d.C); });
-  var P=W.map(function(v){ return ptf(v,d.k); }), out='', i;
-  for(i=0;i<BFACES.length;i++){ var f=BFACES[i];
-    if(!cwf(P[f[0]],P[f[1]],P[f[2]])) continue;
-    out+='<polygon points="'+pstr(f.map(function(k){return P[k];}))+
-         '" fill="#0d0d0d" fill-opacity="'+(1-0.42*shadeFace(W,f)).toFixed(3)+
-         '" stroke="#ffd400" stroke-width="1.1" stroke-linejoin="round"/>'; }
+  var P=W.map(function(v){ return ptf(v,d.k); }), out=bodySVG(W,P);
   // Ампулы сквозные: рисуем их на той грани, что сейчас к нам, иначе после
   // разворота корпус стал бы глухой чёрной плашкой.
   var zf=cwf(P[4],P[5],P[6])?HD:-HD;
@@ -478,54 +495,57 @@ function startFig(kind){
       function q(v){ var o=axOff(m_ap(R,v)); return [VW/2+o[0]*axS, VH/2+o[1]*axS]; }
       var P=LOC.map(q), W=LOC.map(function(v){return m_ap(R,v);}), i;
 
-      var body='';
-      for(i=0;i<BFACES.length;i++){ var f=BFACES[i];
-        if(!cwf(P[f[0]],P[f[1]],P[f[2]])) continue;
-        body+='<polygon points="'+pstr(f.map(function(k){return P[k];}))+
-              '" fill="#0d0d0d" fill-opacity="'+(1-0.42*shadeFace(W,f)).toFixed(3)+
-              '" stroke="#ffd400" stroke-width="1.1" stroke-linejoin="round"/>'; }
+      var body=bodySVG(W,P);
       var zf=cwf(P[4],P[5],P[6])?HD:-HD;
       deco(zf).forEach(function(gg){
         body+='<polygon points="'+pstr(gg.p.map(q))+'" fill="'+gg.f+'" fill-opacity="'+gg.o+'"/>'; });
 
-      // Оси выходят ИЗ КОРПУСА, а не протыкают его насквозь. Линия идёт от
-      // центра, но её внутренняя часть закрыта самим телом: ось, смотрящая от
-      // нас, рисуется ДО корпуса, смотрящая на нас - ПОСЛЕ. Свободная часть
-      // у всех трёх одинаковой длины (AX_EXT), поэтому тройка смотрится ровно,
-      // хотя выходят они с разной глубины - корпус вытянутый.
-      var back='', front='', O=q([0,0,0]);
+      // Каждая ось начинается НА СВОЕЙ ГРАНИ, в её середине, и уходит строго
+      // наружу - внутрь корпуса заходить нечему. Торец у линии СРЕЗАН и старт
+      // отодвинут на волос от поверхности: круглый торец выпирал на полтолщины
+      // внутрь грани и давал светлое пятно ровно в точке касания.
+      // Ось, смотрящая от нас, рисуется ДО корпуса, на нас - ПОСЛЕ.
+      var back='', front='';
       for(var k2=0;k2<3;k2++){
-        var dd=[0,0,0]; dd[k2]=AX_EXT_FROM[k2]+AX_EXT;
-        var e=q(dd), on=(k2===axis);
-        var toward=m_ap(AXVIEW,m_ap(R,dd))[2] > 0;
-        var ux=e[0]-O[0], uy=e[1]-O[1], ul=Math.hypot(ux,uy)||1; ux/=ul; uy/=ul;
+        var s0=[0,0,0]; s0[k2]=AX_EXT_FROM[k2]+AX_GAP;
+        var s1=[0,0,0]; s1[k2]=AX_EXT_FROM[k2]+AX_EXT;
+        var A=q(s0), B=q(s1), on=(k2===axis);
+        var dir=[0,0,0]; dir[k2]=1;
+        var toward=m_ap(AXVIEW,m_ap(R,dir))[2] > 0;
+        var ux=B[0]-A[0], uy=B[1]-A[1], ul=Math.hypot(ux,uy)||1; ux/=ul; uy/=ul;
         var s='';
-        s+='<line x1="'+O[0].toFixed(1)+'" y1="'+O[1].toFixed(1)+'" x2="'+e[0].toFixed(1)+'" y2="'+e[1].toFixed(1)+'" stroke="#ffd400" stroke-width="'+(on?5.5:4)+'" stroke-linecap="round"/>';
-        s+='<line x1="'+O[0].toFixed(1)+'" y1="'+O[1].toFixed(1)+'" x2="'+e[0].toFixed(1)+'" y2="'+e[1].toFixed(1)+'" stroke="#0d0d0d" stroke-width="'+(on?2.6:1.4)+'" stroke-linecap="round"/>';
-        // Наконечник вместо шарика: шарик наезжал на букву и читался кляксой.
-        var hl2=(on?11:8), hw=(on?4.4:3.2);
-        var bx2=e[0]-ux*hl2, by2=e[1]-uy*hl2;
-        s+='<polygon points="'+e[0].toFixed(1)+','+e[1].toFixed(1)+' '+
+        s+='<line x1="'+A[0].toFixed(1)+'" y1="'+A[1].toFixed(1)+'" x2="'+B[0].toFixed(1)+'" y2="'+B[1].toFixed(1)+'" stroke="#ffd400" stroke-width="'+(on?4.4:3.2)+'"/>';
+        s+='<line x1="'+A[0].toFixed(1)+'" y1="'+A[1].toFixed(1)+'" x2="'+B[0].toFixed(1)+'" y2="'+B[1].toFixed(1)+'" stroke="#0d0d0d" stroke-width="'+(on?2.2:1.3)+'"/>';
+        // Наконечник без обводки: жёлтый ободок на фоне корпуса читался кляксой.
+        var hl2=(on?10:7.5), hw=(on?4:3);
+        var bx2=B[0]-ux*hl2, by2=B[1]-uy*hl2;
+        s+='<polygon points="'+B[0].toFixed(1)+','+B[1].toFixed(1)+' '+
             (bx2-uy*hw).toFixed(1)+','+(by2+ux*hw).toFixed(1)+' '+
-            (bx2+uy*hw).toFixed(1)+','+(by2-ux*hw).toFixed(1)+
-            '" fill="#0d0d0d" stroke="#ffd400" stroke-width="1.2" stroke-linejoin="round"/>';
-        // Буква отодвигается от наконечника на ФИКСИРОВАННОЕ число пикселей
-        // вдоль оси. При любом ракурсе зазор один и тот же, наезда не будет.
-        var lx=e[0]+ux*(on?19:15), ly=e[1]+uy*(on?19:15);
+            (bx2+uy*hw).toFixed(1)+','+(by2-ux*hw).toFixed(1)+'" fill="#0d0d0d" stroke="none"/>';
+        // Буква отодвинута от наконечника на ФИКСИРОВАННОЕ число пикселей:
+        // при любом ракурсе зазор один и тот же, наезда не будет.
+        var lx=B[0]+ux*(on?18:14), ly=B[1]+uy*(on?18:14);
         s+='<text x="'+lx.toFixed(1)+'" y="'+(ly+(on?7:5)).toFixed(1)+'" text-anchor="middle" font-family="Helvetica Neue,Arial" font-size="'+(on?21:14)+'" font-weight="800" fill="#0d0d0d" stroke="#ffd400" stroke-width="3.5" paint-order="stroke">'+['X','Y','Z'][k2]+'</text>';
         if(toward) front+=s; else back+=s;
       }
 
       var arcS='';
       if(t<AX_TURN){
-        var u=[0,0,0]; u[(axis+1)%3]=AX_EXT_FROM[(axis+1)%3]+16;
-        var w=[0,0,0]; w[(axis+2)%3]=AX_EXT_FROM[(axis+2)%3]+16;
+        // Дуга маленькая и сидит НА оси, у наконечника: обводить ею весь
+        // корпус было и громоздко, и непонятно вокруг чего. Радиус подобран
+        // так, что ни у одной из трёх осей она не задевает грань.
+        var c0=AX_EXT_FROM[axis]+AX_EXT*0.55, r0=13;
+        var u=[0,0,0]; u[(axis+1)%3]=r0;
+        var w=[0,0,0]; w[(axis+2)%3]=r0;
+        var base=[0,0,0]; base[axis]=c0;
         var arc='';
-        for(var s2=0;s2<=16;s2++){ var ph=th-1.5+s2/16*1.5;
-          var pn=q([u[0]*Math.cos(ph)+w[0]*Math.sin(ph), u[1]*Math.cos(ph)+w[1]*Math.sin(ph), u[2]*Math.cos(ph)+w[2]*Math.sin(ph)]);
+        for(var s2=0;s2<=18;s2++){ var ph=th-1.7+s2/18*1.7;
+          var pn=q([base[0]+u[0]*Math.cos(ph)+w[0]*Math.sin(ph),
+                    base[1]+u[1]*Math.cos(ph)+w[1]*Math.sin(ph),
+                    base[2]+u[2]*Math.cos(ph)+w[2]*Math.sin(ph)]);
           arc+=(s2?' L':'M')+pn[0].toFixed(1)+','+pn[1].toFixed(1); }
-        arcS+='<path d="'+arc+'" fill="none" stroke="#ffd400" stroke-width="6" stroke-linecap="round"/>';
-        arcS+='<path d="'+arc+'" fill="none" stroke="#0d0d0d" stroke-width="2" stroke-linecap="round"/>';
+        arcS+='<path d="'+arc+'" fill="none" stroke="#ffd400" stroke-width="5" stroke-linecap="round"/>';
+        arcS+='<path d="'+arc+'" fill="none" stroke="#0d0d0d" stroke-width="1.8" stroke-linecap="round"/>';
       }
 
       g.innerHTML=back+body+front+arcS;
@@ -547,15 +567,12 @@ function startFig(kind){
       var a=ptf([r[0],r[1],0],0), b=ptf([r[2],r[3],0],0);
       out+='<rect x="'+Math.min(a[0],b[0]).toFixed(1)+'" y="'+Math.min(a[1],b[1]).toFixed(1)+
            '" width="'+Math.abs(b[0]-a[0]).toFixed(1)+'" height="'+Math.abs(b[1]-a[1]).toFixed(1)+
-           '" fill="#0d0d0d" fill-opacity="'+(i?0.62:0.34)+'"'+(i?' stroke="#0d0d0d" stroke-opacity="0.5" stroke-width="1"':'')+'/>'; }
+           '" fill="#0d0d0d" fill-opacity="'+(i?0.40:0.20)+'"/>'; }
     var d=sc.lev(t);
     out+=drawLevel(d);
-    // Метки касания загораются на посадке: взгляд идёт туда, куда и должен.
-    if(d.land>0.01){
-      [[X0,0],[BX0,BH]].forEach(function(c){
-        var a2=ptf([c[0]-9,c[1],0],0), b2=ptf([c[0]+9,c[1],0],0);
-        out+='<line x1="'+a2[0].toFixed(1)+'" y1="'+a2[1].toFixed(1)+'" x2="'+b2[0].toFixed(1)+'" y2="'+b2[1].toFixed(1)+
-             '" stroke="#ffd400" stroke-width="2.6" stroke-linecap="round" opacity="'+d.land.toFixed(2)+'"/>'; }); }
+    // В точках опоры НЕ рисуется ничего. Корпус просто кончается там, где
+    // начинается стол: граница держится разницей тона. Любая линия здесь -
+    // хоть светлая, хоть тёмная - читается щелью, потому что её там нет.
     if(d.sq){
       var o1=ptf([X0,0,0],0), o2=ptf([X0,48,0],0), o3=ptf([X0+48,0,0],0);
       out+='<path d="M'+o2[0].toFixed(1)+','+o2[1].toFixed(1)+' L'+o1[0].toFixed(1)+','+o1[1].toFixed(1)+
