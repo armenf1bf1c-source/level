@@ -96,11 +96,18 @@ button:disabled{opacity:.3}
 /* ---------------- заставка ---------------- */
 #sp{position:fixed;inset:0;z-index:20;overflow:hidden}
 #sp .lay{position:absolute;inset:0}
-#sp .num{position:absolute;left:0;right:0;top:40%;text-align:center;font-size:62px;
+/* Слово стоит НИЖЕ цифры, а не на её месте: иначе выходило, будто «Lolid»
+   пришёл вместо числа и занял его строку. Теперь число спокойно уходит,
+   а знак собирается отдельным блоком под ним. */
+#sp .num{position:absolute;left:0;right:0;top:29%;text-align:center;font-size:58px;
   font-weight:800;letter-spacing:-.05em;font-variant-numeric:tabular-nums}
-#sp .wd{position:absolute;left:0;right:0;top:40%;text-align:center;font-size:clamp(40px,13vw,54px);
-  font-weight:800;opacity:0}
-#sp .ln{position:absolute;top:calc(40% + 86px);left:50%;height:4px;width:0;transform:translateX(-50%)}
+#sp .ln{position:absolute;top:calc(29% + 78px);left:50%;height:3px;width:0;transform:translateX(-50%)}
+#sp .wd{position:absolute;left:0;right:0;top:50%;text-align:center;
+  font-size:clamp(44px,15vw,60px);font-weight:800;opacity:0}
+#sp .wln{position:absolute;top:calc(50% + 72px);left:50%;height:4px;width:0;
+  background:#0d0d0d;transform:translateX(-50%)}
+#sp .sub{position:absolute;left:0;right:0;top:calc(50% + 88px);text-align:center;
+  font-size:12px;font-weight:800;letter-spacing:.34em;color:#0d0d0d;opacity:0}
 </style>
 
 <header>
@@ -148,6 +155,8 @@ button:disabled{opacity:.3}
   <div class="lay" id="top" style="background:#ffd400;clip-path:inset(0 0 100% 0)">
     <div class="num" id="n2" style="color:#0d0d0d">0.00°</div>
     <div class="wd" id="wd" style="color:#0d0d0d;letter-spacing:.78em">LOLID</div>
+    <div class="wln" id="wln"></div>
+    <div class="sub" id="sub">DIGITAL LEVEL</div>
     <div class="ln" id="l2" style="background:#0d0d0d"></div>
   </div>
 </div>
@@ -300,7 +309,7 @@ function drawMain(p){
    Проекция косая: передняя грань лежит ровно в плоскости чертежа, поэтому
    касание видно там, где оно и есть. Стол, кубик и угольник плоские всегда.
    =========================================================================== */
-var KX=0.40, KY=0.26, VW=250, VH=178, PADF=9;
+var KX=0.40, KY=0.26, VW=250, VH_STEP=168, VH_AX=200, VH=168, PADF=9;
 
 function m_rot(a,t){var c=Math.cos(t),s=Math.sin(t);
   if(a===0)return[[1,0,0],[0,c,-s],[0,s,c]];
@@ -397,7 +406,7 @@ function fitScene(sc){
 
 /* ---------------------- калибровка осей: вращение ---------------------- */
 var AX_SEQ=[0,0,1,2,2,1];   // этот порядок обходит все шесть сторон
-var AX_LEN=74, AX_LREL=1.22, AX_TURN=3.2, AX_HOLD=1.6;
+var AX_EXT=34, AX_EXT_FROM=[HL,HT,HD], AX_TURN=3.2, AX_HOLD=1.6;
 var AXVIEW=m_mul(m_rot(0,-0.32), m_rot(1,0.55));
 var axS=1;
 function axOff(p){ var q=m_ap(AXVIEW,p), k=1600/(1600-q[2]); return [q[0]*k,-q[1]*k]; }
@@ -408,18 +417,24 @@ function axFit(){
       var RR=m_mul(m,m_rot(AX_SEQ[s],Math.PI/2*q/10));
       for(i=0;i<LOC.length;i++){ var p=axOff(m_ap(RR,LOC[i]));
         mx=Math.max(mx,Math.abs(p[0])); my=Math.max(my,Math.abs(p[1])); }
-      for(k=0;k<3;k++){ var d=[0,0,0]; d[k]=AX_LEN*AX_LREL;
+      for(k=0;k<3;k++){ var d=[0,0,0]; d[k]=AX_EXT_FROM[k]+AX_EXT;
         var e=axOff(m_ap(RR,d)); mx=Math.max(mx,Math.abs(e[0])); my=Math.max(my,Math.abs(e[1])); }
     }
     m=m_mul(m,m_rot(AX_SEQ[s],Math.PI/2));
   }
-  axS=Math.min((VW/2-16)/mx,(VH/2-18)/my);
+  // Запас под наконечник и букву: они отодвинуты от кончика на фиксированное
+  // число ПИКСЕЛЕЙ, в единицах сцены их не измерить.
+  axS=Math.min((VW/2-30)/mx,(VH/2-30)/my);
 }
 
 var LBL=['X+','X−','Y+','Y−','Z+','Z−'];   // порядок сторон как в faceOf() прибора
 
 // Одна разметка на все шаги: <svg> с пустой группой, в которую движок пишет.
-var FIG='<svg viewBox="0 0 250 178" style="width:100%;display:block"><g id="fg"></g></svg>';
+// Рамка под каждый вид своя: вращающееся тело с осями требует высоты,
+// а лежащему на столе она была бы пустым полем.
+function figSvg(kind){
+  return '<svg viewBox="0 0 250 '+(kind==='axes'?VH_AX:VH_STEP)+'" style="width:100%;display:block"><g id="fg"></g></svg>';
+}
 
 function shadeFace(W,f){
   var u=v_sub(W[f[1]],W[f[0]]), v=v_sub(W[f[2]],W[f[0]]);
@@ -437,7 +452,7 @@ function drawLevel(d){
     if(!cwf(P[f[0]],P[f[1]],P[f[2]])) continue;
     out+='<polygon points="'+pstr(f.map(function(k){return P[k];}))+
          '" fill="#0d0d0d" fill-opacity="'+(1-0.42*shadeFace(W,f)).toFixed(3)+
-         '" stroke="#ffd400" stroke-width="2" stroke-linejoin="round"/>'; }
+         '" stroke="#ffd400" stroke-width="1.1" stroke-linejoin="round"/>'; }
   // Ампулы сквозные: рисуем их на той грани, что сейчас к нам, иначе после
   // разворота корпус стал бы глухой чёрной плашкой.
   var zf=cwf(P[4],P[5],P[6])?HD:-HD;
@@ -453,7 +468,7 @@ function startFig(kind){
   var t0=performance.now();
 
   if(kind==='axes'){
-    axFit();
+    VH=VH_AX; axFit();
     var M0=[[1,0,0],[0,1,0],[0,0,1]], step=0, tA=performance.now();
     (function tick(now){
       var t=(now-tA)/1000, DUR=AX_TURN+AX_HOLD;
@@ -461,55 +476,78 @@ function startFig(kind){
       var axis=AX_SEQ[step], th=(t<AX_TURN? Math.PI/2*ease(t/AX_TURN) : Math.PI/2);
       var R=m_mul(M0,m_rot(axis,th));
       function q(v){ var o=axOff(m_ap(R,v)); return [VW/2+o[0]*axS, VH/2+o[1]*axS]; }
-      var P=LOC.map(q), W=LOC.map(function(v){return m_ap(R,v);}), out='', i;
+      var P=LOC.map(q), W=LOC.map(function(v){return m_ap(R,v);}), i;
+
+      var body='';
       for(i=0;i<BFACES.length;i++){ var f=BFACES[i];
         if(!cwf(P[f[0]],P[f[1]],P[f[2]])) continue;
-        out+='<polygon points="'+pstr(f.map(function(k){return P[k];}))+
-             '" fill="#0d0d0d" fill-opacity="'+(1-0.42*shadeFace(W,f)).toFixed(3)+
-             '" stroke="#ffd400" stroke-width="2" stroke-linejoin="round"/>'; }
+        body+='<polygon points="'+pstr(f.map(function(k){return P[k];}))+
+              '" fill="#0d0d0d" fill-opacity="'+(1-0.42*shadeFace(W,f)).toFixed(3)+
+              '" stroke="#ffd400" stroke-width="1.1" stroke-linejoin="round"/>'; }
       var zf=cwf(P[4],P[5],P[6])?HD:-HD;
       deco(zf).forEach(function(gg){
-        out+='<polygon points="'+pstr(gg.p.map(q))+'" fill="'+gg.f+'" fill-opacity="'+gg.o+'"/>'; });
-      // Оси прибора крутятся ВМЕСТЕ с ним, поэтому та, вокруг которой идёт
-      // поворот, стоит на месте. Жёлтая подложка под чёрной линией - без неё
-      // ось пропадала бы над чёрной гранью.
-      var O=q([0,0,0]);
+        body+='<polygon points="'+pstr(gg.p.map(q))+'" fill="'+gg.f+'" fill-opacity="'+gg.o+'"/>'; });
+
+      // Оси выходят ИЗ КОРПУСА, а не протыкают его насквозь. Линия идёт от
+      // центра, но её внутренняя часть закрыта самим телом: ось, смотрящая от
+      // нас, рисуется ДО корпуса, смотрящая на нас - ПОСЛЕ. Свободная часть
+      // у всех трёх одинаковой длины (AX_EXT), поэтому тройка смотрится ровно,
+      // хотя выходят они с разной глубины - корпус вытянутый.
+      var back='', front='', O=q([0,0,0]);
       for(var k2=0;k2<3;k2++){
-        var dd=[0,0,0]; dd[k2]=AX_LEN;
+        var dd=[0,0,0]; dd[k2]=AX_EXT_FROM[k2]+AX_EXT;
         var e=q(dd), on=(k2===axis);
-        out+='<line x1="'+O[0].toFixed(1)+'" y1="'+O[1].toFixed(1)+'" x2="'+e[0].toFixed(1)+'" y2="'+e[1].toFixed(1)+'" stroke="#ffd400" stroke-width="'+(on?10:7)+'" stroke-linecap="round"/>';
-        out+='<line x1="'+O[0].toFixed(1)+'" y1="'+O[1].toFixed(1)+'" x2="'+e[0].toFixed(1)+'" y2="'+e[1].toFixed(1)+'" stroke="#0d0d0d" stroke-width="'+(on?4.5:2)+'" stroke-linecap="round"/>';
-        out+='<circle cx="'+e[0].toFixed(1)+'" cy="'+e[1].toFixed(1)+'" r="'+(on?5.5:3.5)+'" fill="#0d0d0d" stroke="#ffd400" stroke-width="2"/>';
-        var Lp=q([dd[0]*AX_LREL,dd[1]*AX_LREL,dd[2]*AX_LREL]);
-        out+='<text x="'+Lp[0].toFixed(1)+'" y="'+(Lp[1]+5).toFixed(1)+'" text-anchor="middle" font-family="Helvetica Neue,Arial" font-size="'+(on?23:15)+'" font-weight="800" fill="#0d0d0d" stroke="#ffd400" stroke-width="4.5" paint-order="stroke">'+['X','Y','Z'][k2]+'</text>';
+        var toward=m_ap(AXVIEW,m_ap(R,dd))[2] > 0;
+        var ux=e[0]-O[0], uy=e[1]-O[1], ul=Math.hypot(ux,uy)||1; ux/=ul; uy/=ul;
+        var s='';
+        s+='<line x1="'+O[0].toFixed(1)+'" y1="'+O[1].toFixed(1)+'" x2="'+e[0].toFixed(1)+'" y2="'+e[1].toFixed(1)+'" stroke="#ffd400" stroke-width="'+(on?5.5:4)+'" stroke-linecap="round"/>';
+        s+='<line x1="'+O[0].toFixed(1)+'" y1="'+O[1].toFixed(1)+'" x2="'+e[0].toFixed(1)+'" y2="'+e[1].toFixed(1)+'" stroke="#0d0d0d" stroke-width="'+(on?2.6:1.4)+'" stroke-linecap="round"/>';
+        // Наконечник вместо шарика: шарик наезжал на букву и читался кляксой.
+        var hl2=(on?11:8), hw=(on?4.4:3.2);
+        var bx2=e[0]-ux*hl2, by2=e[1]-uy*hl2;
+        s+='<polygon points="'+e[0].toFixed(1)+','+e[1].toFixed(1)+' '+
+            (bx2-uy*hw).toFixed(1)+','+(by2+ux*hw).toFixed(1)+' '+
+            (bx2+uy*hw).toFixed(1)+','+(by2-ux*hw).toFixed(1)+
+            '" fill="#0d0d0d" stroke="#ffd400" stroke-width="1.2" stroke-linejoin="round"/>';
+        // Буква отодвигается от наконечника на ФИКСИРОВАННОЕ число пикселей
+        // вдоль оси. При любом ракурсе зазор один и тот же, наезда не будет.
+        var lx=e[0]+ux*(on?19:15), ly=e[1]+uy*(on?19:15);
+        s+='<text x="'+lx.toFixed(1)+'" y="'+(ly+(on?7:5)).toFixed(1)+'" text-anchor="middle" font-family="Helvetica Neue,Arial" font-size="'+(on?21:14)+'" font-weight="800" fill="#0d0d0d" stroke="#ffd400" stroke-width="3.5" paint-order="stroke">'+['X','Y','Z'][k2]+'</text>';
+        if(toward) front+=s; else back+=s;
       }
+
+      var arcS='';
       if(t<AX_TURN){
-        var u=[0,0,0]; u[(axis+1)%3]=34;
-        var w=[0,0,0]; w[(axis+2)%3]=34;
+        var u=[0,0,0]; u[(axis+1)%3]=AX_EXT_FROM[(axis+1)%3]+16;
+        var w=[0,0,0]; w[(axis+2)%3]=AX_EXT_FROM[(axis+2)%3]+16;
         var arc='';
         for(var s2=0;s2<=16;s2++){ var ph=th-1.5+s2/16*1.5;
           var pn=q([u[0]*Math.cos(ph)+w[0]*Math.sin(ph), u[1]*Math.cos(ph)+w[1]*Math.sin(ph), u[2]*Math.cos(ph)+w[2]*Math.sin(ph)]);
           arc+=(s2?' L':'M')+pn[0].toFixed(1)+','+pn[1].toFixed(1); }
-        out+='<path d="'+arc+'" fill="none" stroke="#ffd400" stroke-width="8" stroke-linecap="round"/>';
-        out+='<path d="'+arc+'" fill="none" stroke="#0d0d0d" stroke-width="3" stroke-linecap="round"/>';
+        arcS+='<path d="'+arc+'" fill="none" stroke="#ffd400" stroke-width="6" stroke-linecap="round"/>';
+        arcS+='<path d="'+arc+'" fill="none" stroke="#0d0d0d" stroke-width="2" stroke-linecap="round"/>';
       }
-      g.innerHTML=out;
+
+      g.innerHTML=back+body+front+arcS;
       figRaf=requestAnimationFrame(tick);
     })(t0);
     return;
   }
 
+  VH=VH_STEP;
   var sc=SCN[kind]; if(!sc) return;
   fitScene(sc);
   (function tick(now){
     var t=((now-t0)/1000)%sc.dur, out='', i;
-    // Стол сплошной, без контура. Кубик и угольник - отдельные тела с жёлтым
-    // контуром: по нему и видно, что они СТОЯТ на столе, а не вырезаны из него.
+    // Стол и кубик СВЕТЛЕЕ уровня: полупрозрачная чернота по жёлтому даёт
+    // третий тон. Раньше всё было одинаково чёрным, и единственной границей
+    // между телами оставался жёлтый контур - он и читался выемкой,
+    // прорезанной в столе. Теперь тела разнятся тоном, а контур им не нужен.
     for(i=0;i<sc.flat.length;i++){ var r=sc.flat[i];
       var a=ptf([r[0],r[1],0],0), b=ptf([r[2],r[3],0],0);
       out+='<rect x="'+Math.min(a[0],b[0]).toFixed(1)+'" y="'+Math.min(a[1],b[1]).toFixed(1)+
            '" width="'+Math.abs(b[0]-a[0]).toFixed(1)+'" height="'+Math.abs(b[1]-a[1]).toFixed(1)+
-           '" fill="#0d0d0d"'+(i?' stroke="#ffd400" stroke-width="2.5"':'')+'/>'; }
+           '" fill="#0d0d0d" fill-opacity="'+(i?0.62:0.34)+'"'+(i?' stroke="#0d0d0d" stroke-opacity="0.5" stroke-width="1"':'')+'/>'; }
     var d=sc.lev(t);
     out+=drawLevel(d);
     // Метки касания загораются на посадке: взгляд идёт туда, куда и должен.
@@ -517,11 +555,11 @@ function startFig(kind){
       [[X0,0],[BX0,BH]].forEach(function(c){
         var a2=ptf([c[0]-9,c[1],0],0), b2=ptf([c[0]+9,c[1],0],0);
         out+='<line x1="'+a2[0].toFixed(1)+'" y1="'+a2[1].toFixed(1)+'" x2="'+b2[0].toFixed(1)+'" y2="'+b2[1].toFixed(1)+
-             '" stroke="#ffd400" stroke-width="4" stroke-linecap="round" opacity="'+d.land.toFixed(2)+'"/>'; }); }
+             '" stroke="#ffd400" stroke-width="2.6" stroke-linecap="round" opacity="'+d.land.toFixed(2)+'"/>'; }); }
     if(d.sq){
       var o1=ptf([X0,0,0],0), o2=ptf([X0,48,0],0), o3=ptf([X0+48,0,0],0);
       out+='<path d="M'+o2[0].toFixed(1)+','+o2[1].toFixed(1)+' L'+o1[0].toFixed(1)+','+o1[1].toFixed(1)+
-           ' L'+o3[0].toFixed(1)+','+o3[1].toFixed(1)+'" fill="none" stroke="#0d0d0d" stroke-width="4"/>';
+           ' L'+o3[0].toFixed(1)+','+o3[1].toFixed(1)+'" fill="none" stroke="#0d0d0d" stroke-width="2.6"/>';
       var tp=ptf([X0+74,36,0],0);
       out+='<text x="'+tp[0].toFixed(1)+'" y="'+tp[1].toFixed(1)+'" text-anchor="middle" font-family="Helvetica Neue,Arial" font-size="26" font-weight="800" fill="#0d0d0d" stroke="#ffd400" stroke-width="5" paint-order="stroke">90</text>';
     }
@@ -577,7 +615,7 @@ function drawCal(p){
   var step=d.s;
   if(/^STEP/.test(step) && calTotal) step+=' / '+calTotal;
   html+='<div class="cstep">'+step+'</div><h2 class="ch">'+d.t+'</h2><p class="cp">'+d.p+'</p>'+
-        '<div class="cfig">'+FIG+'</div>';
+        '<div class="cfig">'+figSvg(d.f)+'</div>';
   if(d.dots){
     // Клетки заполняются ПО МАСКЕ прибора, а не по счётчику: только так видно,
     // какие стороны уже сделаны. По счётчику экран подсказывал бы порядок,
@@ -629,7 +667,8 @@ $('btnCal').addEventListener('click',function(){ $('cal').dataset.mode=''; openC
    rAF не тикает, пока вкладка не на экране, и заставка повисла бы навсегда. */
 (function splash(){
   var sp=$('sp'), n1=$('n1'), n2=$('n2'), l1=$('l1'), l2=$('l2'), top=$('top'), wd=$('wd');
-  var TOTAL=5.6, t0=performance.now(), raf=null;
+  var wln=$('wln'), sub=$('sub');
+  var TOTAL=6.2, t0=performance.now(), raf=null;
   function end(){ sp.style.transition='opacity .5s'; sp.style.opacity='0';
     setTimeout(function(){ if(sp.parentNode) sp.parentNode.removeChild(sp); },520); }
   setTimeout(function(){ if(raf) cancelAnimationFrame(raf); if($('sp')) end(); },(TOTAL+1.4)*1000);
@@ -644,11 +683,18 @@ $('btnCal').addEventListener('click',function(){ $('cal').dataset.mode=''; openC
     if(t>2.05&&t<2.95){ var dd=Math.min(1,(t-2.05)/.70); l1.style.width=(118*dd).toFixed(0)+'px'; }
     if(t>=3.05){ var k=Math.min(1,(t-3.05)/.34), e=k*k*(3-2*k);
       top.style.clipPath='inset(0 0 '+(100-100*e).toFixed(1)+'% 0)'; l2.style.width='118px'; }
-    if(t>3.55){ var m=Math.min(1,(t-3.55)/1.15), q=1-Math.pow(1-m,4);
-      n2.style.opacity=Math.max(0,1-m*2.2).toFixed(2);
+    // Число и его черта уходят ВМЕСТЕ, а знак собирается ниже, на своём месте.
+    if(t>3.55){ var m=Math.min(1,(t-3.55)/0.6);
+      n2.style.opacity=Math.max(0,1-m).toFixed(2);
+      l2.style.opacity=Math.max(0,1-m).toFixed(2); }
+    // Знак: буквы стягиваются из широкого разлёта, под ними прочерчивается
+    // черта, и последней проступает подпись. Три такта, а не один.
+    if(t>3.75){ var q=1-Math.pow(1-Math.min(1,(t-3.75)/1.25),4);
       wd.style.opacity=q.toFixed(2);
-      wd.style.letterSpacing=(0.78-0.60*q).toFixed(3)+'em';
-      l2.style.width=(118+56*q).toFixed(0)+'px'; }
+      wd.style.letterSpacing=(0.78-0.60*q).toFixed(3)+'em'; }
+    if(t>4.45){ var r2=1-Math.pow(1-Math.min(1,(t-4.45)/0.7),3);
+      wln.style.width=(r2*184).toFixed(0)+'px'; }
+    if(t>4.95){ sub.style.opacity=Math.min(1,(t-4.95)/0.7).toFixed(2); }
     if(t<TOTAL) raf=requestAnimationFrame(tick); else end();
   })(t0);
 })();
