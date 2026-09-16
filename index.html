@@ -174,6 +174,11 @@ h2,p{margin:0}
    и накрывает обе чёрные линии - так настоящая лупа и лежит на линейке;
    вырезанным окном вровень с рамкой она не читалась бы. Пальцу не мешает:
    события указателя проходят сквозь неё к барабану. */
+/* Стекло появляется только под пальцем. Постоянно висящая лупа закрывает
+   четырнадцать градусов шкалы там, где смотреть как раз и надо, а нужна она
+   ровно в тот момент, когда барабан крутят. */
+.lens{display:none}
+.drum.hold .lens{display:block}
 .lens{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
   width:154px;height:66px;border-radius:999px;
   background:var(--surface-sheet);border:var(--border) solid var(--lolid-ink);
@@ -945,17 +950,42 @@ function drawChips(){
   })(bs[i]);
 }
 
+/* ------------------------- фиксация на круглых ---------------------------
+   Значение под пальцем притягивается к ближайшему кратному пяти: у ровных
+   0, 5, 10, 15 шкала как бы залипает, и попасть в них можно не целясь.
+   Промежуточные углы при этом никуда не деваются - чуть дальше от риски ход
+   снова обычный.
+   Функция непрерывна: на границе окна, при d = ±DETENT, она возвращает ровно
+   d, поэтому в момент выхода из ямки значение не прыгает. Внутри окна ход
+   вдвое медленнее у самой риски и разгоняется к её краю - это и есть
+   ощущение щелчка.                                                         */
+var DETENT=1.2;
+function detent(v){
+  var n=Math.round(v/5)*5, d=v-n;
+  if(Math.abs(d)>=DETENT) return v;
+  return n + d*Math.abs(d)/DETENT;
+}
+
 (function drumDrag(){
   var el=$('drum'), drag=null;
   el.addEventListener('pointerdown',function(e){
     drag={x:e.clientX,t:target};
+    el.classList.add('hold');           // лупа живёт только пока палец на месте
     if(el.setPointerCapture) el.setPointerCapture(e.pointerId);
   });
   el.addEventListener('pointermove',function(e){
     if(!drag) return;
-    setTarget(drag.t-(e.clientX-drag.x)/PPD);
+    setTarget(detent(drag.t-(e.clientX-drag.x)/PPD));
   });
-  function up(){ if(!drag) return; drag=null; setTarget(Math.round(target*2)/2); }
+  function up(){
+    el.classList.remove('hold');
+    if(!drag) return;
+    drag=null;
+    // Отпустили рядом с круглым - встаём ровно на него, а не на ближайшую
+    // половинку: иначе залипание было бы только на вид.
+    var n=Math.round(target/5)*5;
+    setTarget(Math.abs(target-n)<0.75 ? n : Math.round(target*2)/2);
+  }
   el.addEventListener('pointerup',up);
   el.addEventListener('pointercancel',up);
 })();
