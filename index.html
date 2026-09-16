@@ -90,7 +90,9 @@
   --hair:1px;
 }
 
-*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;
+  -webkit-user-select:none;user-select:none}   /* выделение текста выдало бы
+     браузер внутри приложения, а выделять здесь нечего */
 html,body{height:100%}
 body{margin:0;background:var(--surface-sheet);color:var(--text-primary);
   font:14px/1.4 var(--font-core);overflow:hidden}
@@ -748,6 +750,11 @@ S[M.AUTODONE]={s:'DONE',t:'LEVEL<br>UP',p:'Axes set. Now run 2 POINT to set the 
 // ровно тогда, когда прибор говорит обратное.
 var S_FAIL={s:'DONE',t:'TRY<br>AGAIN',p:'Show more different sides, and hold still on each one.',f:'axes'};
 
+/* Приложение для Android подставляет объект AndroidBle: связь ведёт система,
+   а не браузер. Ни одного экрана это не меняет - только чем они говорят с
+   прибором. */
+var NATIVE = (typeof AndroidBle !== "undefined") && AndroidBle;
+
 var $=function(id){return document.getElementById(id);};
 var dec=new TextDecoder(), enc=new TextEncoder();
 var device=null, chCmd=null, last=null, prevMode=0, prevRel=false;
@@ -805,6 +812,13 @@ function setState(txt,live){
 function note(m,bad){ $('note').textContent=m||''; $('note').className='note'+(bad?' err':''); }
 
 async function connect(){
+  /* В приложении для Android связь ведёт система, а не браузер: в WebView
+     Web Bluetooth нет и не будет. Мост даёт те же события, поэтому дальше
+     страница ведёт себя одинаково в обоих местах. */
+  if(NATIVE){
+    show('main'); note(''); setState('SCANNING',false);
+    AndroidBle.connect(); return;
+  }
   if(!navigator.bluetooth){
     show('main');
     note('This browser has no Bluetooth.\nOn iPhone open this page in Bluefy.',1); return;
@@ -840,15 +854,40 @@ function onLost(){
   closeCal();
   note('Device disconnected.');
 }
-function send(c){ if(chCmd) chCmd.writeValue(enc.encode(c)); }
+
+/* ------------------------- мост в приложение Android ----------------------
+   Три точки входа, которые зовёт Kotlin. Разбор пакета НЕ продублирован:
+   восемнадцать байт приходят как есть и попадают в тот же handlePacket, что
+   и из браузера. Считать угол в двух местах - значит однажды посчитать
+   по-разному.                                                              */
+window.nativePacket=function(hex){
+  var n=hex.length>>1, b=new Uint8Array(n);
+  for(var i=0;i<n;i++) b[i]=parseInt(hex.substr(i*2,2),16);
+  handlePacket(new DataView(b.buffer));
+};
+window.nativeState=function(s){
+  if(s==='LINKED'){
+    setState('LINKED',true); everLinked=true;
+    try{ localStorage.setItem('lolid.seen','1'); }catch(e){}
+    note('');
+  } else if(s==='OFFLINE'){
+    if(everLinked) onLost(); else setState('OFFLINE',false);
+  } else setState(s,false);
+};
+window.nativeNote=function(t){ note(t); };
+function send(c){
+  if(NATIVE){ AndroidBle.send(c); return; }
+  if(chCmd) chCmd.writeValue(enc.encode(c));
+}
 
 /* ---------------------------- пакет замера --------------------------------
    18 байт, младший байт первым:
      0 float угол · 4 float поперечный · 8 float |a|
      12 uint8 режим · 13 uint8 флаги · 14 uint16 счётчик
      16 uint8 ход шага · 17 uint8 маска сторон                                */
-function onMeas(e){
-  var d=e.target.value;
+function onMeas(e){ handlePacket(e.target.value); }
+
+function handlePacket(d){
   if(d.byteLength<16) return;
   var p={a:d.getFloat32(0,true),b:d.getFloat32(4,true),mag:d.getFloat32(8,true),
          mode:d.getUint8(12),rel:(d.getUint8(13)&1)!==0,
@@ -1177,10 +1216,10 @@ $('btnCal').addEventListener('click',openCal);
     setTimeout(function(){ if(sp.parentNode) sp.parentNode.removeChild(sp); },520);
     var seen=false; try{ seen=localStorage.getItem('lolid.seen')==='1'; }catch(e){}
     show(seen?'main':'onb');
-    if(seen && !navigator.bluetooth)
+    if(seen && !NATIVE && !navigator.bluetooth)
       note('This browser has no Bluetooth.\nOn iPhone open this page in Bluefy.',1);
     else if(seen) note('Switch the level on, then tap connect.');
-    else if(!navigator.bluetooth)
+    else if(!NATIVE && !navigator.bluetooth)
       $('obNote').textContent='This browser has no Bluetooth.\nOn iPhone open this page in Bluefy.';
   }
   setTimeout(function(){ if(raf) cancelAnimationFrame(raf); end(); },(TOTAL+1.4)*1000);
