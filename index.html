@@ -518,13 +518,60 @@ button:disabled{opacity:.3;cursor:default}
   }
 
   function svgMarkup(kind){
-    return '<svg viewBox="0 0 250 '+(kind==='axes'?VH_AX:VH_STEP)+'" style="width:100%;display:block"><g class="fg"></g></svg>';
+    var h = (kind==='axes') ? VH_AX : (kind==='done' ? VH_DONE : VH_STEP);
+    return '<svg viewBox="0 0 250 '+h+'" style="width:100%;display:block"><g class="fg"></g></svg>';
+  }
+
+  /* ----------------------------- «LEVEL UP» -----------------------------
+     Та же отметка, что рисует прибор в конце калибровки (drawDoneBadge в
+     measure.cpp): расходящееся кольцо, растущий круг, галочка двумя
+     отрезками по очереди. Пропорции галочки взяты оттуда же и считаются от
+     радиуса, поэтому знак совпадает с приборным при любом размере.
+     Играет ОДИН раз и замирает: это не обучающая петля, а точка. */
+  var VH_DONE = 120;
+  function doneSVG(t){
+    var cx=125, cy=60, r=30, out='';
+    if(t<0.7){
+      var k=t/0.7, rr=r*0.7+k*(r+22);
+      out+='<circle cx="'+cx+'" cy="'+cy+'" r="'+rr.toFixed(1)+
+           '" fill="none" stroke="#0a6b3d" stroke-width="2" opacity="'+(1-k).toFixed(2)+'"/>';
+    }
+    out+='<circle cx="'+cx+'" cy="'+cy+'" r="'+(r*Math.min(1,t/0.32)).toFixed(1)+'" fill="#0a6b3d"/>';
+    if(t>0.24){
+      var q=Math.min(1,(t-0.24)/0.42), s=r/26;
+      var ax=cx-12*s, ay=cy+1*s, bx=cx-3*s, by=cy+10*s, ex=cx+13*s, ey=cy-10*s;
+      var k1=Math.min(1,q/0.38);
+      out+='<path d="M'+ax.toFixed(1)+','+ay.toFixed(1)+' L'+(ax+(bx-ax)*k1).toFixed(1)+','+
+           (ay+(by-ay)*k1).toFixed(1)+'" fill="none" stroke="#ffd400" stroke-width="6" stroke-linecap="round"/>';
+      if(q>0.38){
+        var k2=Math.min(1,(q-0.38)/0.62);
+        out+='<path d="M'+bx.toFixed(1)+','+by.toFixed(1)+' L'+(bx+(ex-bx)*k2).toFixed(1)+','+
+             (by+(ey-by)*k2).toFixed(1)+'" fill="none" stroke="#ffd400" stroke-width="6" stroke-linecap="round"/>';
+      }
+    }
+    return out;
   }
 
   function start(g, kind){
     if(!g) return function(){};
     var raf=null, stopped=false;
     function cancel(){ stopped=true; if(raf) cancelAnimationFrame(raf); }
+
+    if(kind==='done'){
+      var tD=performance.now();
+      // Страховка тем же приёмом, что у заставки: requestAnimationFrame не
+      // тикает, пока страница не на экране, и отметка застыла бы на первом
+      // кадре - пустой зелёной точке без галочки. По таймеру дорисовываем
+      // последний кадр в любом случае.
+      var fin=setTimeout(function(){ if(!stopped) g.innerHTML=doneSVG(1.2); },1300);
+      (function tick(now){
+        if(stopped){ clearTimeout(fin); return; }
+        var t=(now-tD)/1000;
+        g.innerHTML=doneSVG(t);
+        if(t<1.2) raf=requestAnimationFrame(tick); else clearTimeout(fin);
+      })(performance.now());
+      return cancel;
+    }
 
     if(kind==='axes'){
       VH=VH_AX; axFit();
@@ -688,11 +735,18 @@ S[M.W2] ={s:'STEP 2',t:'TURN IT<br>180°',p:'Same block, same spot, the other wa
 S[M.M2] ={s:'STEP 2',t:'HOLD<br>STILL',p:'Don’t touch it.',f:'s2',bar:1};
 S[M.W90]={s:'STEP 3',t:'TIP IT<br>UP',p:'Stand it on its end, flush against a true square. Accuracy here is only as good as your square.',f:'s3',b:'MEASURE'};
 S[M.M90]={s:'STEP 3',t:'HOLD<br>STILL',p:'Don’t touch it.',f:'s3',bar:1};
-S[M.DONE]={s:'DONE',t:'LEVEL<br>UP',p:'Calibration written to the device. It survives power off.',f:'s1'};
+S[M.DONE]={s:'DONE',t:'LEVEL<br>UP',p:'Calibration written to the device. It survives power off.',f:'done'};
 /* Кнопки здесь НЕТ намеренно: нажать нужно один раз, чтобы начать, дальше
    только переворачивать. Прибор сам ловит покой и берёт сторону. */
 S[M.AUTO]={s:'AXES',t:'TURN IT<br>OVER',p:'Turn the level about each of its axes and hold still. It takes every side by itself — nothing to press.',f:'axes',dots:1};
-S[M.AUTODONE]={s:'DONE',t:'AXES<br>SET',p:'Now run 2 POINT to set the zero.',f:'axes'};
+// Прибор в конце ЛЮБОЙ калибровки пишет одно и то же - LEVEL UP с галочкой.
+// Телефон обязан говорить теми же словами, иначе два экрана рассказывают
+// про одно событие по-разному.
+S[M.AUTODONE]={s:'DONE',t:'LEVEL<br>UP',p:'Axes set. Now run 2 POINT to set the zero.',f:'done'};
+// Осевая может и не сойтись - прибор тогда пишет TRY AGAIN. Телефон узнаёт
+// об этом по биту 2 в flags: без него он рисовал бы галочку и «получилось»
+// ровно тогда, когда прибор говорит обратное.
+var S_FAIL={s:'DONE',t:'TRY<br>AGAIN',p:'Show more different sides, and hold still on each one.',f:'axes'};
 
 var $=function(id){return document.getElementById(id);};
 var dec=new TextDecoder(), enc=new TextEncoder();
@@ -798,6 +852,7 @@ function onMeas(e){
   if(d.byteLength<16) return;
   var p={a:d.getFloat32(0,true),b:d.getFloat32(4,true),mag:d.getFloat32(8,true),
          mode:d.getUint8(12),rel:(d.getUint8(13)&1)!==0,
+         fail:(d.getUint8(13)&4)!==0,   /* осевая не сошлась, см. ble.cpp */
          prog:d.byteLength>=17?d.getUint8(16)/255:0,
          /* Маска взятых сторон, бит на сторону. Счётчика мало: телефон должен
             показать, КАКИЕ стороны уже сделаны, а не сколько. */
@@ -951,19 +1006,20 @@ function drawChips(){
 }
 
 /* ------------------------- фиксация на круглых ---------------------------
-   Значение под пальцем притягивается к ближайшему кратному пяти: у ровных
-   0, 5, 10, 15 шкала как бы залипает, и попасть в них можно не целясь.
-   Промежуточные углы при этом никуда не деваются - чуть дальше от риски ход
-   снова обычный.
-   Функция непрерывна: на границе окна, при d = ±DETENT, она возвращает ровно
-   d, поэтому в момент выхода из ямки значение не прыгает. Внутри окна ход
-   вдвое медленнее у самой риски и разгоняется к её краю - это и есть
-   ощущение щелчка.                                                         */
-var DETENT=1.2;
+   Значение под пальцем притягивается к ближайшему кратному пяти. Окно
+   притяжения - 2.5 градуса, то есть ПОЛОВИНА шага: ямки сомкнуты, и любая
+   точка шкалы принадлежит какой-нибудь из них. Мягкой зоны "просто так" не
+   осталось - оттого и хватка жёсткая.
+   Ход внутри ямки кубический, и у самой риски производная равна НУЛЮ:
+   первые миллиметры пальца не двигают цифру вообще, она держится за круглый
+   градус и срывается только осознанным движением - примерно двенадцать
+   пикселей. Это и есть щелчок.
+   На границе, при d = ±DETENT, функция возвращает ровно d, поэтому ямки
+   стыкуются без разрыва и на переходе между ними цифра не прыгает.         */
+var DETENT=2.5;
 function detent(v){
-  var n=Math.round(v/5)*5, d=v-n;
-  if(Math.abs(d)>=DETENT) return v;
-  return n + d*Math.abs(d)/DETENT;
+  var n=Math.round(v/5)*5, d=v-n, a=Math.abs(d)/DETENT;
+  return n + d*a*a;
 }
 
 (function drumDrag(){
@@ -1036,7 +1092,7 @@ function syncFig(kind){
 }
 
 function drawCal(p){
-  var d=S[p.mode], html=HEAD;
+  var d=(p.mode===M.AUTODONE && p.fail) ? S_FAIL : S[p.mode], html=HEAD;
 
   if(!d){   /* прибор свободен - показываем выбор способа */
     html+='<div class="eyebrow step">CALIBRATION</div><h2 class="ch">CHOOSE<br>A METHOD</h2><div style="margin-top:16px">'+
