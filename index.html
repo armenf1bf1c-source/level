@@ -157,14 +157,35 @@ h2,p{margin:0}
 .tgtrow span:first-child{font-size:var(--size-key);font-weight:var(--weight-core);letter-spacing:var(--track-key)}
 .tgtrow span:last-child{font-size:22px;font-weight:var(--weight-core);
   letter-spacing:var(--track-deviation);font-variant-numeric:tabular-nums}
-.drum{position:relative;height:52px;overflow:hidden;cursor:grab;touch-action:none;
+/* Рамка и дорожка разделены: дорожка обрезает риски по краям, а лупа лежит
+   СНАРУЖИ неё и поэтому может выходить за чёрные линии. Поля 10px сверху и
+   снизу - под вылет стекла, иначе оно налезло бы на строку и на метки. */
+.drum{position:relative;height:52px;cursor:grab;touch-action:none;margin:16px 0;
   border-top:var(--border) solid var(--rule-ink);
   border-bottom:var(--border) solid var(--rule-ink)}
-.drum i{position:absolute;bottom:0;display:block}
-.drum u{position:absolute;top:5px;transform:translateX(-50%);text-decoration:none;
+.track{position:absolute;inset:0;overflow:hidden}
+.track i{position:absolute;bottom:0;display:block}
+.track u{position:absolute;top:5px;transform:translateX(-50%);text-decoration:none;
   font-size:13px;font-weight:var(--weight-core);letter-spacing:-.02em;
   font-variant-numeric:tabular-nums}
-.drum .mid{position:absolute;top:0;bottom:0;left:50%;width:4px;margin-left:-2px}
+.track .mid{position:absolute;top:0;bottom:0;left:50%;width:4px;margin-left:-2px}
+
+/* ЛУПА. Жёлтое стекло, чёрные риски, оправа 3px. Стекло ВЫШЕ рамки барабана
+   и накрывает обе чёрные линии - так настоящая лупа и лежит на линейке;
+   вырезанным окном вровень с рамкой она не читалась бы. Пальцу не мешает:
+   события указателя проходят сквозь неё к барабану. */
+.lens{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
+  width:154px;height:66px;border-radius:999px;
+  background:var(--surface-sheet);border:var(--border) solid var(--lolid-ink);
+  overflow:hidden;pointer-events:none}
+.lens i{position:absolute;bottom:4px;display:block;background:var(--lolid-ink)}
+.lens .val{position:absolute;left:50%;top:4px;transform:translateX(-50%);
+  font-size:26px;font-weight:var(--weight-core);letter-spacing:-.04em;line-height:1;
+  font-variant-numeric:tabular-nums;color:var(--lolid-ink)}
+/* Метка центра - короткая засечка снизу, у самой оправы. Сплошная черта
+   пришлась бы прямо на цифру и перечеркнула бы её, а верхняя засечка села бы
+   на её макушку. */
+.lens .cx{position:absolute;left:50%;bottom:0;width:5px;height:10px;margin-left:-2.5px}
 .chips{display:flex;gap:4px;margin-top:6px}
 .chips button{flex:1;height:26px;padding:0;font-size:11px;letter-spacing:var(--track-cap)}
 
@@ -647,6 +668,7 @@ var RANGE=10.0;   /* BUBBLE_RANGE */
 var TOL=0.15;     /* LEVEL_TOL - стоит на границе округления, см. config.h прибора */
 var NEAR=3.0;     /* ширина «подходишь» - только показ, на приговор не влияет */
 var HALF=46;      /* половина рабочей ширины шкалы, % */
+var PPD=7;        /* пикселей на градус в барабане TARGET */
 
 /* Режимы прибора: порядок как в enum ButtonMode (calib.h). Своего
    представления о происходящем телефон НЕ держит - он показывает то, что
@@ -848,9 +870,13 @@ function drawDrum(){
   var t=Math.round(target*10)/10;
   $('tgtv').textContent=(t<0?'−':'+')+Math.abs(t).toFixed(1)+'°';
   var col=last?colOf(Math.abs(t!==0?last.a-t:deviation(last.a))):'var(--surface-inverse)';
-  if(drumKey===t){ var mid=$('drum').querySelector('.mid'); if(mid) mid.style.background=col; return; }
+  if(drumKey===t){
+    var mid=$('drum').querySelector('.mid'); if(mid) mid.style.background=col;
+    var cx=$('drum').querySelector('.cx');   if(cx)  cx.style.background=col;
+    return;
+  }
   drumKey=t;
-  var PPD=7, SPAN=28, h='';
+  var SPAN=28, h='';
   var lo=Math.ceil(t-SPAN), hi=Math.floor(t+SPAN);
   for(var i=lo;i<=hi;i++){
     if(i<-90||i>90) continue;
@@ -863,7 +889,42 @@ function drawDrum(){
        (i<0?'−':'')+Math.abs(i)+'</u>';
   }
   h+='<div class="mid" style="background:'+col+'"></div>';
-  $('drum').innerHTML=h;
+  $('drum').innerHTML='<div class="track">'+h+'</div><div class="lens">'+glassHTML(t,col)+'</div>';
+}
+
+/* ---------------------------------- лупа ----------------------------------
+   Рыбий глаз: точка на расстоянии u от центра стекла попадает на
+       x = R · (d+1)·s / (d·|s| + 1),   s = u/R
+   Крайняя точка отображается сама в себя (s=1 даёт x=R), поэтому риска под
+   оправой встаёт ровно туда, где она была бы без лупы: линейка не рвётся у
+   края, а вспухает к середине. Увеличение в центре равно d+1, у оправы падает
+   до 1/(d+1) - это и есть завал, как в настоящем стекле.
+   Вместе с положением меняется и РАЗМЕР риски: без этого вышло бы неравномерное
+   сжатие, а не оптика.                                                      */
+var LENS_R=74, LENS_D=2;
+function lensX(u){ var s=u/LENS_R, a=Math.abs(s);
+  return (s<0?-1:1)*LENS_R*((LENS_D+1)*a)/(LENS_D*a+1); }
+function lensM(u){ var a=Math.abs(u/LENS_R), k=LENS_D*a+1; return (LENS_D+1)/(k*k); }
+
+function glassHTML(t,col){
+  var h='', reach=LENS_R/PPD+1;
+  var lo=Math.ceil(t-reach), hi=Math.floor(t+reach);
+  for(var i=lo;i<=hi;i++){
+    if(i<-90||i>90) continue;
+    var u=(i-t)*PPD;
+    if(Math.abs(u)>LENS_R) continue;
+    var x=lensX(u), m=lensM(u), major=(i%5===0);
+    var mv=1+(m-1)*0.55;                       // по высоте мягче, чем по ширине
+    var w=Math.max(1,(major?3:1.4)*Math.min(m,2.4));
+    // Выше 22px риски не пускаем: там стоит цифра, и они бы её перечеркнули.
+    var ht=Math.min(22,(major?17:9)*mv);
+    var op=(1-0.28*Math.abs(u)/LENS_R)*(major?1:0.6);
+    h+='<i style="left:calc(50% + '+x.toFixed(1)+'px);margin-left:'+(-w/2).toFixed(2)+
+       'px;width:'+w.toFixed(2)+'px;height:'+ht.toFixed(1)+'px;opacity:'+op.toFixed(3)+'"></i>';
+  }
+  h+='<div class="cx" style="background:'+col+'"></div>';
+  h+='<span class="val">'+(t<0?'−':'+')+Math.abs(t).toFixed(1)+'°</span>';
+  return h;
 }
 function setTarget(v){ target=Math.max(-90,Math.min(90,v)); drawDrum(); drawChips(); if(last) drawMain(last); }
 
@@ -892,7 +953,7 @@ function drawChips(){
   });
   el.addEventListener('pointermove',function(e){
     if(!drag) return;
-    setTarget(drag.t-(e.clientX-drag.x)/7);
+    setTarget(drag.t-(e.clientX-drag.x)/PPD);
   });
   function up(){ if(!drag) return; drag=null; setTarget(Math.round(target*2)/2); }
   el.addEventListener('pointerup',up);
