@@ -242,11 +242,11 @@ button:disabled{opacity:.3;cursor:default}
 <!-- ============================ ЗАСТАВКА ============================= -->
 <div id="sp">
   <div class="lay" style="background:var(--surface-inverse)">
-    <div class="num" id="n1" style="color:var(--text-inverse)">0.00°</div>
+    <div class="num" id="n1" style="color:var(--text-inverse)">0.0°</div>
     <div class="ln" id="l1" style="background:var(--text-inverse)"></div>
   </div>
   <div class="lay" id="top" style="background:var(--surface-sheet);clip-path:inset(0 0 100% 0)">
-    <div class="num" id="n2" style="color:var(--text-primary)">0.00°</div>
+    <div class="num" id="n2" style="color:var(--text-primary)">0.0°</div>
     <div class="wd" id="wd" style="color:var(--text-primary);letter-spacing:.78em">LOLID</div>
     <div class="wln" id="wln"></div>
     <div class="sub" id="sub">DIGITAL LEVEL</div>
@@ -644,7 +644,7 @@ var CMD ='6c6f6c69-6402-1000-8000-00805f9b34fb';
 
 /* Должны совпадать с config.h прибора, иначе шкала начнёт врать о себе. */
 var RANGE=10.0;   /* BUBBLE_RANGE */
-var TOL=0.10;     /* LEVEL_TOL */
+var TOL=0.15;     /* LEVEL_TOL - стоит на границе округления, см. config.h прибора */
 var NEAR=3.0;     /* ширина «подходишь» - только показ, на приговор не влияет */
 var HALF=46;      /* половина рабочей ширины шкалы, % */
 
@@ -806,14 +806,14 @@ function drawMain(p){
   var ad = Math.abs(dev), col=colOf(ad);
 
   $('eyebrow').textContent = (linked && p.rel) ? 'RELATIVE ANGLE' : 'ABSOLUTE ANGLE';
-  $('ang').textContent = linked ? shown.toFixed(2) : '—';
+  $('ang').textContent = linked ? shown.toFixed(1) : '—';
   $('deg').textContent = linked ? '°' : '';
 
   var band=document.querySelector('.band');
   if(linked){
     band.style.background=col;
     $('verd').textContent = verdictWord(ref,hasTarget)+' · '+(ad<TOL?'OK':'OFF');
-    $('dev').textContent = (dev<0?'−':'+')+ad.toFixed(2)+'°';
+    $('dev').textContent = (dev<0?'−':'+')+ad.toFixed(1)+'°';
   }else{
     /* Чернильная полоса, а не зелёная: молчащий прибор не «ровно». */
     band.style.background='var(--surface-inverse)';
@@ -822,7 +822,7 @@ function drawMain(p){
   }
 
   $('capM').textContent = linked ? ('FROM '+(Number.isInteger(ref)?ref:ref.toFixed(1))+'°') : ' ';
-  $('cross').textContent = linked ? p.b.toFixed(2)+'°' : '—';
+  $('cross').textContent = linked ? p.b.toFixed(1)+'°' : '—';
   /* |a| обязана быть 1.000 в ЛЮБОМ положении: сила тяжести от поворота не
      меняется. Отклонение - прямая мера того, как плохо откалиброваны оси. */
   var G=$('mag');
@@ -917,9 +917,9 @@ function drawRel(){
     ? 'Angles are read from the held reading. The absolute one is still there, one tap away.'
     : 'For a slope that is not level and should not be. The current reading becomes the new zero.')+'</p>';
   html+='<div class="kv first"><span>HELD ZERO</span><span>'+
-        (rel&&heldZero!==null ? heldZero.toFixed(2)+'°' : '—')+'</span></div>';
+        (rel&&heldZero!==null ? heldZero.toFixed(1)+'°' : '—')+'</span></div>';
   html+='<div class="kv second"><span>ANGLE NOW</span><span>'+
-        (absNow!==null ? absNow.toFixed(2)+'°' : '—')+'</span></div>';
+        (absNow!==null ? absNow.toFixed(1)+'°' : '—')+'</span></div>';
   if(rel&&heldZero===null)
     html+='<p class="cp">The zero was set on the device itself, so this page never saw the absolute reading. Drop it and set it again from here to see both.</p>';
   html+='<div class="cfoot"><button class="pri" id="rAct">'+(rel?'DROP ZERO':'SET ZERO')+'</button>'+
@@ -1042,9 +1042,9 @@ $('btnCal').addEventListener('click',openCal);
     var t=(now-t0)/1000;
     var v=86*Math.exp(-1.35*t)*Math.cos(t*3.3);
     if(t<2.55){
-      var s=(Math.abs(v)<0.02?0:Math.abs(v)).toFixed(2)+'°';
+      var s=(Math.abs(v)<0.02?0:Math.abs(v)).toFixed(1)+'°';
       n1.textContent=s; n2.textContent=s;
-    } else { n1.textContent=n2.textContent='0.00°'; }
+    } else { n1.textContent=n2.textContent='0.0°'; }
     if(t>2.05&&t<2.95){ var dd=Math.min(1,(t-2.05)/.70); l1.style.width=(118*dd).toFixed(0)+'px'; }
     if(t>=3.05){ var k=Math.min(1,(t-3.05)/.34), e=k*k*(3-2*k);
       top.style.clipPath='inset(0 0 '+(100-100*e).toFixed(1)+'% 0)'; l2.style.width='118px'; }
